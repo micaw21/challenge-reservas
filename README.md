@@ -105,7 +105,7 @@ challenge/
 
 ### 2.2 Decisiones técnicas
 
-- **Python 3.11+ solo con biblioteca estándar** (`argparse`, `sqlite3`, `datetime`, `unittest`) — sin dependencias externas, para ejecución local reproducible. Elegido por el solicitante: "vamos con python + sqlite".
+- **Python 3.11+ solo con biblioteca estándar** (`argparse`, `sqlite3`, `datetime`, `unittest`) — sin dependencias externas, para ejecución local reproducible. Stack indicado por el solicitante en la especificación inicial.
 - **SQLite en un archivo local** (`data/reservas.db`): persistencia simple y recupera reservas/estados al reiniciar (R-05).
 - **CLI con códigos de salida:** proceso termina con `0` cuando la operación se acepta y `1` cuando se rechaza (validación, unidad desconocida o superposición). Facilita verificación humana y automatización.
 - **Validación y superposición en la capa de aplicación** (clase `Laboratorio`): las reglas V-1…V-9 viven en un solo lugar y se usan tanto en `reservar` como en `disponibilidad` (V-9). La superposición es **estricta** (`inicio < fin_ajena and inicio_ajena < fin`), por lo que los límites consecutivos se permiten (V-7).
@@ -258,8 +258,8 @@ ERROR: fecha y hora inválidas: 'ayer' (se espera 'YYYY-MM-DD HH:MM')
 
 ### 3.2 Instrucciones
 
-- **Instrucción base del harness:** reglas de OpenCode (uso de herramientas, estilo de respuesta, gestión de código). No se conserva transcripción completa solo extractos relevantes.
-- **Instrucciones del solicitante (por episodio):** se entregan en cada episodio como mensaje del usuario; el extracto relevante queda registrado en la [sección 4.2](#42-registro-de-episodios-delegación-al-agente).
+- **Instrucción base del harness:** reglas de OpenCode (uso de herramientas, estilo de respuesta, gestión de código). No se conserva la transcripción completa.
+- **Instrucciones del solicitante (por episodio):** se entregan como mensajes por episodio y quedan registradas solo como **resúmenes neutros** en la [sección 4.2](#42-registro-de-episodios-delegación-al-agente), sin citas textuales.
 
 ### 3.3 Contexto
 
@@ -283,7 +283,7 @@ ERROR: fecha y hora inválidas: 'ayer' (se espera 'YYYY-MM-DD HH:MM')
 
 ### 3.6 Evidencia de uso real
 
-Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones completas; solo extractos y enlaces.
+Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones completas; solo resúmenes de instrucciones y enlaces a commits/pruebas.
 
 | Episodio | Versión | Evidencia | Enlace |
 |----------|---------|-----------|--------|
@@ -305,7 +305,7 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 
 | # | Decisión | Motivo | Alternativas | Consecuencias |
 |---|----------|--------|--------------|---------------|
-| D-01 | Stack Python 3.11+ (solo stdlib) + SQLite en archivo local | Elección del solicitante ("vamos con python + sqlite"); ejecución local pequeña y verificable sin dependencias | Node/JSON, Go, Docker+Postgres (descartadas: más piezas que verificar y mantener) | Instalación es "clonar y ejecutar"; límites: una sola instancia escribiendo a la vez (suficiente para el caso local) |
+| D-01 | Stack Python 3.11+ (solo stdlib) + SQLite en archivo local | Definido por el solicitante en la especificación inicial (Python + SQLite); ejecución local pequeña y verificable sin dependencias | Node/JSON, Go, Docker+Postgres (descartadas: más piezas que verificar y mantener) | Instalación reduce a "clonar y ejecutar"; límite: una sola instancia escribiendo a la vez (suficiente para el caso local) |
 | D-02 | CLI con códigos de proceso (0 aceptado / 1 rechazado) | Hace verificable el rechazo de una operación (superposición, validación) sin parsear texto | Salida JSON (más pesada para inspección humana) | Las pruebas verifican comportamiento vía API y CLI; la consulta de disponibilidad ocupada sale con `1` |
 | D-03 | Pruebas con `unittest` (stdlib) en vez de pytest | Cero dependencias: la verificación también corre con Python de fábrica | pytest (más ergonómico pero agregó dependencia) | Suite de 32 pruebas en `tests/test_reservas.py`; el enunciado de pytest no es necesario |
 | D-04 | Superposición estricta implementada en Python (clase `Laboratorio`), no en SQL | Reglas V-1…V-9 en un solo lugar reutilizadas por `reservar` y `disponibilidad` (V-9); fáciles de testear | Query SQL con BETWEEN / paquete dedicado de calendarios | Riesgo de divergencia si mañana se consultara directamente por SQL; hoy no existe ese caso |
@@ -317,16 +317,18 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 
 ### 4.2 Registro de episodios (delegación al agente)
 
-Para cada episodio registrar: objetivo y requisito → contexto suministrado y extracto de instrucción →
+Para cada episodio registrar: objetivo y requisito → contexto suministrado y resumen de la instrucción →
 acción o resultado del agente → decisión humana de aceptar/corregir/rechazar con motivo → enlace a
 archivo, commit, prueba o resultado verificable.
+
+Instrucciones: se registran como **resúmenes neutros**, sin citas textuales del solicitante.
 
 Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 
 #### Episodio 1 — Preparación de la documentación (README)
 
 - **Objetivo y requisito:** crear el README organizado en cuatro secciones (especificación, solución, preparación del agente, registro de decisiones/delegación) con plantillas y criterios de la solicita.
-- **Contexto suministrado y extracto de instrucción:** *"requiero crear un readme organizado en cuatro secciones… por ahora solo crealo con esto y vamos a ir rellenando con lo necesario. siempre actualizá el readme"*.
+- **Contexto suministrado y resumen de la instrucción:** estructura pedida del README en cuatro secciones (especificación solución, datos del agente, registro de decisiones y delegación), crear como plantilla inicial y actualizarla en cada episodio del trabajo.
 - **Acción o resultado del agente:** creó `README.md` con las 4 secciones y plantillas `TODO`, con las notas de documentación (sin secretos, solicitantes ficticios, sin transcripciones).
 - **Decisión humana y motivo:** **aceptar** — el solicitante continuó el trabajo y pidió rellenar los datos del agente con los reales del agente.
 - **Evidencia:** commit `4472118` (README con datos del agente en la sección 3); commit `2a89bce` registra el hash de esa evidencia.
@@ -335,7 +337,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 #### Episodio 2 — Registro de la especificación
 
 - **Objetivo y requisito:** cargar en el README la especificación del challenge (problema, alcance, reglas mínimas y ejemplo MIC-01) según el enunciado dado por el solicitante.
-- **Contexto suministrado y extracto de instrucción:** *"Construir una solución local pequeña y verificable… coordinación de un laboratorio… consultar disponibilidad, reservar y cancelar sin perder el historial… vamos con python + sqlite"* más la tabla de inventario (5 unidades) suministrada como imagen.
+- **Contexto suministrado y resumen de la instrucción:** construir una solución local pequeña y verificable para la coordinación de un laboratorio (consultar disponibilidad, reservar y cancelar sin perder historial), con alcance y reglas mínimas descritos en el enunciado, avance con Python + SQLite, y tabla de inventario de 5 unidades adjunta como imagen.
 - **Acción o resultado del agente:** completó la sección 1 del README (problema, alcance in/out, R-01…R-06, reglas V-1…V-9 con el ejemplo del enunciado, supuestos, CA-01…CA-05) y dejó definida la sección 2.2 con el stack elegido.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** `README.md` sección 1, commit `cf0637c`.
@@ -344,7 +346,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 #### Episodio 3 — Implementación y verificación (cuarta entrega del episodio en un único ciclo delegado)
 
 - **Objetivo y requisito:** construir la solución Python + SQLite local con reglas V-1…V-9 y persistencia (R-01…R-06), con pruebas automatizadas.
-- **Contexto suministrado y extracto de instrucción:** el episodio 2 de especificación (*"vamos con python + sqlite"*).
+- **Contexto suministrado y resumen de la instrucción:** implementar la especificación del episodio 2 con el stack indicado (Python + SQLite).
 - **Acción o resultado del agente:** escribió `reservas.py` (API `Laboratorio` + CLI de 6 comandos con códigos de proceso) y `tests/test_reservas.py` (32 pruebas de unittest) que cubren inventario precargado, superposición estricta, límites consecutivos, unidades distintas, cancelación conservando datos, persistencia al reiniciar, reset y validaciones. Demostración CLI end‑to‑end de la secuencia del ejemplo de MIC‑01 (ver sección 2.7) con los códigos de proceso correctos. Datos persistidos en `data/reservas.db` (no versionado); base reiniciada con `reset` al final para dejar datos limpios.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas`; salida de `python -m unittest discover -s tests` → `Ran 32 tests … OK`; transcript del ejemplo completo capturado en la sección 2.7.
@@ -353,7 +355,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 #### Episodio 4 — Menú de comandos al correr sin argumentos
 
 - **Objetivo y requisito:** hacer que `python .\reservas.py` sin comando muestre un menú de lo que se puede hacer, en lugar del error en seco de argparse (reporte del solicitante con su salida real).
-- **Contexto suministrado y extracto de instrucción:** *"al correr reservas.py agrega un menú de qué se puede hacer"* junto a la salida del error: `reservas: error: the following arguments are required: comando`.
+- **Contexto suministrado y resumen de la instrucción:** al correr `reservas.py` sin comando, mostrar un menú de lo que se puede hacer en lugar del error en seco de argparse; el solicitante adjuntó la salida real del error (`reservas: error: the following arguments are required: comando`).
 - **Acción o resultado del agente:** agregó `_imprimir_menu()` con los 6 comandos, sus opciones requeridas, la ruta de datos y un ejemplo de uso; `main` ahora muestra el menú y sale con código 0 cuando no hay argumentos (con argumentos incorrectos sigue el error 2 de argparse). Prueba nueva `test_menu_sin_comando_sale_con_0`; suite en 33 pruebas en verde. Se actualizó la sección 2.6 con la salida real del menú.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)`; salida del menú documentada en 2.6; suite `Ran 33 tests … OK`. *Nota: en v0.4 (episodio 5) este menú estático fue reemplazado por el modo interactivo (D-08).*
@@ -362,7 +364,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 #### Episodio 5 — Menú interactivo en bucle (v0.4)
 
 - **Objetivo y requisito:** el menú estático del episodio 4 se cerraba tras mostrarlo; el solicitante pidió un bucle con opciones numeradas 1..6, submenús según la opción, pantalla limpia en cada paso, validación de entradas no válidas con mensaje y reintento, y salida con 0 / número negativo / `/salir`.
-- **Contexto suministrado y extracto de instrucción:** *"el menú se cierra a cada rato, la idea es que quede en un for y se pueda elegir la opcion 1 inventario 2 listar… y que se salga con algun numero negativo, 0 o con un /salir. valida que no se puedan ingresar otros valores que no sean los de navegacion del menu… cada vez que se entre en una opcion, pone submenu si es necesario pero limpia la pantalla"*.
+- **Contexto suministrado y resumen de la instrucción:** el menú se cerraba tras cada acción; el solicitante pidió un bucle con opciones numeradas (1 inventario, 2 listar…), salida con 0 / número negativo / `/salir`, validación de valores fuera de la navegación con mensaje y reintento mostrando el menú otra vez, y submenús con limpiar pantalla al entrar en cada opción.
 - **Acción o resultado del agente:** construyó `_menu_interactivo` (bucle con `match` de opciones 1..6), submenús por opción (listar con filtro opcional; disponibilidad/reservar con campos; cancelar valida id numérico antes de tocar la base; reset confirmado con s/N), `_limpiar()` al entrar a cada opción, rechazo de valores fuera de navegación ("Opción no válida… ingrese de nuevo", menú otra vez) y salidas por 0 / negativos / `/salir` (Ctrl+C/Ctrl+D cierran ordenadamente). El modo por comandos directos y sus códigos de proceso siguen igual. Pruebas nuevas `TestMenuInteractivo` con entradas simuladas y base temporal: salidas válidas, opciones inválidas, menú numerado, flujo reservar+listar con persistencia verificada, reset con y sin confirmación → `Ran 39 tests … OK`.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `feat: menu interactivo en bucle…`; pruebas `TestMenuInteractivo`; modo documentado en 2.6a.
@@ -371,7 +373,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 #### Episodio 6 — Ayuda de unidades en cada selección (v0.5)
 
 - **Objetivo y requisito:** que cada vez que el menú pida una unidad (listar con filtro, disponibilidad, reservar) se muestren las unidades disponibles como ayuda.
-- **Contexto suministrado y extracto de instrucción:** *"cada vez que pida un listar o elegir una unidad, que muestre las unidades disponibles como ayuda"*.
+- **Contexto suministrado y resumen de la instrucción:** en cada selección de unidad (listar con filtro, disponibilidad, reservar), mostrar las unidades disponibles como ayuda antes del prompt.
 - **Acción o resultado del agente:** agregó `_ayuda_unidades()` (ID alineado a 8 + equipo) invocada en los tres submenús que piden unidad. Prueba nueva `test_listar_muestra_unidades_como_ayuda` (la ayuda aparece tras el encabezado de listar y antes de los datos, con las 5 unidades y sus equipos) y aserción en el flujo reservar+listar (ayuda al reservar y al filtrar) → `Ran 40 tests … OK`.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `feat: ayuda de unidades en cada seleccion de unidad`; pruebas `TestMenuInteractivo`.
@@ -382,6 +384,6 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 ## Notas de documentación
 
 - No incluir secretos, tokens ni credenciales en este repositorio.
-- No incluir conversaciones privadas completas: solo extractos breves de instrucciones.
+- No incluir conversaciones privadas completas: las instrucciones del solicitante se documentan como resúmenes neutros, sin citas textuales.
 - Usar **solicitantes ficticios**; ningún dato real de estudiantes.
 - Criterio del README: el repositorio explica por sí solo qué se construyó y cómo se comprobó.
