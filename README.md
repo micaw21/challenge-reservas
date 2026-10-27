@@ -265,7 +265,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | Episodio | Versión | Evidencia | Enlace |
 |----------|---------|-----------|--------|
 | 1. Esqueleto del README + datos del agente (sección 3) | v0.1 | `README.md` (secciones creadas; 3 completada con datos del agente) | commit `4472118` — `docs: esqueleto del README y datos del agente (seccion 3)` |
-| 2. Especificación del challenge (sección 1) + stack definido (2.2) | v0.2 | `README.md` secciones 1 y 2 | commit de documentación posterior a `79e2fb0` (hash exacto en 4.2) |
+| 2. Especificación del challenge (sección 1) + stack definido (2.2) | v0.2 | `README.md` secciones 1 y 2 | commit `cf0637c` — `docs: especificacion (seccion 1), solucion (seccion 2) y registro de episodios (seccion 4)` |
 | 3. Implementación Python+SQLite, 32 pruebas y demo CLI (secciones 2.6/2.7) | v0.2 | `reservas.py`, `tests/test_reservas.py`, suite `unittest` en verde | commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas` |
 
 ---
@@ -308,7 +308,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Contexto suministrado y extracto de instrucción:** *"Construir una solución local pequeña y verificable… coordinación de un laboratorio… consultar disponibilidad, reservar y cancelar sin perder el historial… vamos con python + sqlite"* más la tabla de inventario (5 unidades) suministrada como imagen.
 - **Acción o resultado del agente:** completó la sección 1 del README (problema, alcance in/out, R-01…R-06, reglas V-1…V-9 con el ejemplo del enunciado, supuestos, CA-01…CA-05) y dejó definida la sección 2.2 con el stack elegido.
 - **Decisión humana:** pendiente de verificación.
-- **Evidencia:** `README.md` sección 1 (commit de la documentación).
+- **Evidencia:** `README.md` sección 1, commit `cf0637c`.
 - **Correcciones:** ninguna (aún no verificada).
 
 #### Episodio 3 — Implementación y verificación (cuarta entrega del episodio en un único ciclo delegado)
