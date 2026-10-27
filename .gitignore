@@ -1,0 +1,4 @@
+# Estado interno, no versionar
+data/
+__pycache__/
+*.pyc
