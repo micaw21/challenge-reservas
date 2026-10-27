@@ -17,8 +17,10 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+# Base local del proyecto; se puede apuntar a otra con --db (útil en pruebas).
 RUTA_DB = Path(__file__).resolve().parent / "data" / "reservas.db"
 
+# Inventario definido por negocio: se siembra, nunca se administra desde la app.
 INVENTARIO_PRECARGADO: tuple[tuple[str, str], ...] = (
     ("MIC-01", "Microscopio digital"),
     ("MIC-02", "Microscopio digital"),
@@ -38,6 +40,7 @@ class Rechazo(Exception):
 
 
 def _texto_fecha(valor: str) -> str:
+    """Normaliza espacios y acepta la separación ISO de la hora con 'T'."""
     return " ".join(valor.strip().split()).replace("T", " ")
 
 
@@ -88,6 +91,7 @@ class Laboratorio:
             );
             """
         )
+        # Solo siembra si la base es nueva: al reabrir, no duplica inventario.
         if self.conexion.execute("SELECT COUNT(*) FROM inventario").fetchone()[0] == 0:
             self.conexion.executemany(
                 "INSERT INTO inventario (unidad, equipo) VALUES (?, ?)",
@@ -107,6 +111,7 @@ class Laboratorio:
         self.conexion.close()
 
     # ------------------------------------------------------------- consultas
+    # (solo lectura: el inventario es precargado; no hay alta ni baja de unidades)
 
     def unidades(self) -> list[sqlite3.Row]:
         return self.conexion.execute(
@@ -127,7 +132,8 @@ class Laboratorio:
 
     # ------------------------------------------------------------- validación
 
-    def _unidad(self, unidad: str) -> None:
+    def _unidad(self, unidad: str) -> str:
+        # V-1: rechazar unidades fuera del inventario precargado.
         fila = self.conexion.execute(
             "SELECT 1 FROM inventario WHERE unidad = ?", (unidad.strip(),)
         ).fetchone()
@@ -173,6 +179,7 @@ class Laboratorio:
     def reservar(
         self, unidad: str, solicitante: str, inicio: str, fin: str
     ) -> int:
+        # V-1…V-6 en orden: unidad, solicitante, intervalo y superposición.
         unidad = self._unidad(unidad)
         solicitante = self._solicitante(solicitante)
         desde, hasta = self._intervalo(inicio, fin)
@@ -193,6 +200,7 @@ class Laboratorio:
         return cursor.lastrowid
 
     def cancelar(self, id_reserva: int) -> sqlite3.Row:
+        # El historial no se borra: solo cambia el estado (V-5).
         fila = self.conexion.execute(
             "SELECT id, unidad, solicitante, inicio, fin, estado FROM reservas"
             " WHERE id = ?",
@@ -215,6 +223,7 @@ class Laboratorio:
         self, unidad: str, inicio: str, fin: str
     ) -> tuple[str, sqlite3.Row | None]:
         """Devuelve ('LIBRE', None) o ('OCUPADA', reserva_activa_que_solapa)."""
+        # V-9: consulta con exactamente las mismas reglas que la reserva.
         unidad = self._unidad(unidad)
         desde, hasta = self._intervalo(inicio, fin)
         choque = self._activo_solapa(unidad, desde, hasta)
@@ -237,7 +246,7 @@ def _imprimir_reservas(lab: Laboratorio, unidad: str | None) -> int:
         return 0
     for fila in filas:
         print(
-            f" id={fila['id']} [{fila['estado']}] {fila['unidad']}"
+            f"id={fila['id']} [{fila['estado']}] {fila['unidad']}"
             f" {fila['inicio']} -> {fila['fin']} '{fila['solicitante']}'"
         )
     return 0
@@ -300,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"LIBRE: {argumentos.unidad} {_texto_fecha(argumentos.desde)} -> {_texto_fecha(argumentos.hasta)}"
                 )
                 return 0
+            # Ocupada se reporta con código 1 para verificar sin parsear texto.
             print(
                 f"OCUPADA: {argumentos.unidad} {_texto_fecha(argumentos.desde)} -> {_texto_fecha(argumentos.hasta)}"
                 f" (choca con reserva id={choque['id']} activa de"
@@ -324,9 +334,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
     except Rechazo as error:
+        # Cualquier rechazo de negocio comparte código de salida 1.
         print(f"ERROR: {error}")
         return 1
     finally:
+        # Cerrar siempre: evita dejar la base SQLite bloqueada en Windows.
         lab.cerrar()
     return 2  # comando no manejado
 

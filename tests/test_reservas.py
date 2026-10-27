@@ -40,6 +40,7 @@ class BaseLaboratorio(unittest.TestCase):
 
 
 class TestInventario(BaseLaboratorio):
+    """R-01: el inventario precargado se lee sin administrarlo."""
     def test_inventario_precargado(self) -> None:
         unidades = [fila["unidad"] for fila in self.lab.unidades()]
         self.assertEqual(unidades, ["FUE-01", "MIC-01", "MIC-02", "MUL-01", "OSC-01"])
@@ -51,6 +52,7 @@ class TestInventario(BaseLaboratorio):
 
 
 class TestReservas(BaseLaboratorio):
+    """R-03: reserva identificable con unidad, solicitante e intervalo."""
     def test_reserva_tiene_identificador_y_datos(self) -> None:
         id_reserva = self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
         filas = self.lab.reservas()
@@ -65,6 +67,7 @@ class TestReservas(BaseLaboratorio):
 
 
 class TestSuperposicion(BaseLaboratorio):
+    """V-5/V-6: solo las reservas ACTIVAS bloquean su intervalo."""
     def test_superposicion_activa_rechazada(self) -> None:
         # Ejemplo del enunciado: MIC-01 reservado 10:00-11:00.
         self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
@@ -86,6 +89,7 @@ class TestSuperposicion(BaseLaboratorio):
 
 
 class TestLimitesConsecutivos(BaseLaboratorio):
+    """V-7: tocar el límite (fin 11:00 / inicio 11:00) no es superposición."""
     def test_limites_consecutivos_permitidos(self) -> None:
         # Ejemplo del enunciado: 11:00-12:00 permitido con 10:00-11:00.
         self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
@@ -94,6 +98,7 @@ class TestLimitesConsecutivos(BaseLaboratorio):
 
 
 class TestUnidadesDistintas(BaseLaboratorio):
+    """V-8: unidades distintas no se bloquean entre sí."""
     def test_reservas_simultaneas_de_unidades_distintas(self) -> None:
         # Ejemplo del enunciado: MIC-02 puede reservarse en paralelo a MIC-01.
         id_uno = self.reservado("MIC-01", SOLICITANTE_A, DIA_10_00, DIA_11_00)
@@ -102,6 +107,7 @@ class TestUnidadesDistintas(BaseLaboratorio):
 
 
 class TestCancelacion(BaseLaboratorio):
+    """R-04: cancelar conserva id y datos y libera el intervalo."""
     def test_cancelar_conserva_registro_y_datos(self) -> None:
         id_reserva = self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
         self.lab.cancelar(id_reserva)
@@ -129,6 +135,7 @@ class TestCancelacion(BaseLaboratorio):
 
 
 class TestValidaciones(BaseLaboratorio):
+    """V-1…V-4 y V-9: mismas validaciones para reservar y consultar."""
     def test_unidad_desconocida_rechaza(self) -> None:
         with self.assertRaises(Rechazo):
             self.reservado("XXX-99", SOLICITANTE_A, DIA_10_00, DIA_11_00)
@@ -163,6 +170,7 @@ class TestValidaciones(BaseLaboratorio):
 
 
 class TestDisponibilidad(BaseLaboratorio):
+    """R-02: consulta de disponibilidad por unidad e intervalo."""
     def test_libre_si_no_hay_reservas(self) -> None:
         estado, choque = self.lab.disponibilidad(MIC, DIA_10_00, DIA_11_00)
         self.assertEqual(estado, "LIBRE")
@@ -181,6 +189,7 @@ class TestDisponibilidad(BaseLaboratorio):
 
 
 class TestPersistencia(BaseLaboratorio):
+    """R-05: reservas, estados e inventario sobreviven al reiniciar."""
     def test_reserva_persiste_al_reiniciar_aplicacion(self) -> None:
         self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
         self.lab.cerrar()
@@ -214,6 +223,7 @@ class TestPersistencia(BaseLaboratorio):
 
 
 class TestReset(BaseLaboratorio):
+    """Reinicio: vuelven al estado inicial (inventario sembrado, sin reservas)."""
     def test_reset_deja_solo_inventario(self) -> None:
         self.reservado(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
         self.lab.reset()
@@ -222,7 +232,7 @@ class TestReset(BaseLaboratorio):
 
 
 class TestCLI(unittest.TestCase):
-    """Pruebas del intérprete de comandos (códigos de salida y textos)."""
+    """Verificación de la interfaz de comandos: textos y códigos de salida."""
 
     def _ruta(self) -> tuple[Path, tempfile.TemporaryDirectory]:
         tmp = tempfile.TemporaryDirectory()

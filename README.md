@@ -205,9 +205,9 @@ Reserva id=1 cancelada (registro conservado: MIC-01 2026-11-03 10:00 -> 2026-11-
 **Estado final visible con `listar`:**
 
 ```
- id=1 [CANCELADA] MIC-01 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante A'
- id=2 [ACTIVA]    MIC-01 2026-11-03 11:00 -> 2026-11-03 12:00 'Solicitante B'
- id=3 [ACTIVA]    MIC-02 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante C'
+id=1 [CANCELADA] MIC-01 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante A'
+id=2 [ACTIVA] MIC-01 2026-11-03 11:00 -> 2026-11-03 12:00 'Solicitante B'
+id=3 [ACTIVA] MIC-02 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante C'
 ```
 
 **Casos de rechazo por validación (V-1…V-4):**
