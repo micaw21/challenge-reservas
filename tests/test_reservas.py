@@ -293,12 +293,26 @@ class TestMenuInteractivo(unittest.TestCase):
         salida = buffer.getvalue()
         self.assertIn("Reserva creada con id=1", salida)
         self.assertIn(f"[ACTIVA] {MIC}", salida)
+        # La ayuda de unidades aparece al reservar y al pedir el filtro de listar.
+        self.assertGreaterEqual(salida.count("Unidades disponibles:"), 2)
         # La reserva quedó persistida en la base de ese menú.
         lab = Laboratorio(self.ruta_db)
         try:
             self.assertEqual(len(lab.reservas()), 1)
         finally:
             lab.cerrar()
+
+    def test_listar_muestra_unidades_como_ayuda(self) -> None:
+        respuestas = ["2", MIC, "", "0"]  # listar con filtro MIC-01
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        # La ayuda aparece después del encabezado de listar y antes de los datos.
+        self.assertGreater(salida.index("Unidades disponibles:"), salida.index("--- LISTAR RESERVAS ---"))
+        for texto in ("FUE-01", "MIC-01", "MIC-02", "MUL-01", "OSC-01", "Osciloscopio", "Multímetro"):
+            self.assertIn(texto, salida)
 
     def test_reset_desde_menu_reinicia(self) -> None:
         lab = Laboratorio(self.ruta_db)

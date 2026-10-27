@@ -136,7 +136,7 @@ No se requiere `pip install`: no hay dependencias externas.
 
 **Dos modos de uso:**
 
-**a) Modo interactivo** (correr sin comando: `python reservas.py`): bucle de menú con opciones `1`…`6`; se sale con `0`, cualquier número negativo o `/salir`. Los valores fuera de la navegación se rechazan con un mensaje y el menú se vuelve a mostrar. Cada opción limpia la pantalla y, cuando hace falta, pide sus datos como submenú (unidad, solicitante, fechas, id, confirmación de reset con `s/N`); después de cada operación espera Enter para volver.
+**a) Modo interactivo** (correr sin comando: `python reservas.py`): bucle de menú con opciones `1`…`6`; se sale con `0`, cualquier número negativo o `/salir`. Los valores fuera de la navegación se rechazan con un mensaje y el menú se vuelve a mostrar. Cada opción limpia la pantalla y, cuando hace falta, pide sus datos como submenú (unidad, solicitante, fechas, id, confirmación de reset con `s/N`); después de cada operación espera Enter para volver. Cada vez que la app pide una unidad (listar con filtro, disponibilidad, reservar) muestra primero las unidades disponibles del inventario como ayuda:
 
 ```
 === RESERVAS DE EQUIPOS DE LABORATORIO ===
@@ -293,6 +293,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
 | 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
 | 5. Menú interactivo en bucle (reemplaza el menú estático a partir del reporte del aplicante) | v0.4 | `reservas.py` (`_menu_interactivo`, submenús), sección 2.6a, suite en 39 pruebas | commit `809e899` — `feat: menu interactivo en bucle (submenus, valida entradas, sale 0/-n//salir)` |
+| 6. Ayuda de unidades en cada selección de unidad (listar/disponibilidad/reservar) | v0.5 | `reservas.py` (`_ayuda_unidades`), suite en 40 pruebas | commit `feat: ayuda de unidades en cada seleccion` |
 
 ---
 
@@ -312,6 +313,7 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 | D-06 | Salida ASCII en la CLI (p. ej. `->` en lugar de `→`) | Corregir bug real: la consola Windows (cp1252) no codifica flecha Unicode y `print` abortaba | Reconfigurar stdout a UTF-8 (depende de terminal) | Mensajes cortos y robustos en cualquier consola; se registró como corrección en el episodio 3 |
 | D-07 | `python reservas.py` sin argumentos muestra un menú de comandos (y sale 0) | El solicitante reportó que correr la app sin comando mostraba un error seco de argparse; el menú hace la app autoexplicativa para uso local | Dejar el error de argparse (código 2, más rígido); menú interactivo de selección (más código, no pedido) | La app corre con menú sin argumentos; los usos incorrectos con argumentos parcialmente dados siguen con error 2 de argparse |
 | D-08 | El modo sin argumentos es un **menú interactivo en bucle** (opciones 1..6, submenús por opción, pantalla limpia en cada paso, salida con 0/negativo//salir) | El solicitante reportó que el menú estático "se cerraba a cada rato" y pidió selección numerada con validación de entradas | Menú estático del episodio 4 (descartado: no permite operar); pedir comandos en cada paso (menos control) | Experiencia REPL en consola; los comandos directos y sus códigos de proceso siguen igual; pruebas del menú usan entradas simuladas |
+| D-09 | Mostrar las **unidades disponibles como ayuda** junto a cada prompt de unidad (listar con filtro, disponibilidad, reservar) | El solicitante pidió ayuda de unidades en cada selección; reduce errores de tipeo sin consultar el inventario aparte | No mostrar nada (depende de memoria del usuario); menú numerado de unidades (cambia el diseño de navegación pedido) | La lista del inventario se imprime en cada submenú de unidad; una unidad desconocida sigue rechazándose con la lista de unidades conocidas |
 
 ### 4.2 Registro de episodios (delegación al agente)
 
@@ -365,6 +367,15 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `feat: menu interactivo en bucle…`; pruebas `TestMenuInteractivo`; modo documentado en 2.6a.
 - **Correcciones (ocurrieron):** (a) la primera secuencia de entradas de la prueba del flujo reservar+listar tenía una pausa menos que los prompts reales (falla de la prueba, no de la app; `StopIteration`) → corregida la secuencia; (b) dos pruebas de reset dejaban la conexión SQLite abierta y `tempfile` no podía borrar la base en Windows → se cierra explícitamente en las pruebas.
+
+#### Episodio 6 — Ayuda de unidades en cada selección (v0.5)
+
+- **Objetivo y requisito:** que cada vez que el menú pida una unidad (listar con filtro, disponibilidad, reservar) se muestren las unidades disponibles como ayuda.
+- **Contexto suministrado y extracto de instrucción:** *"cada vez que pida un listar o elegir una unidad, que muestre las unidades disponibles como ayuda"*.
+- **Acción o resultado del agente:** agregó `_ayuda_unidades()` (ID alineado a 8 + equipo) invocada en los tres submenús que piden unidad. Prueba nueva `test_listar_muestra_unidades_como_ayuda` (la ayuda aparece tras el encabezado de listar y antes de los datos, con las 5 unidades y sus equipos) y aserción en el flujo reservar+listar (ayuda al reservar y al filtrar) → `Ran 40 tests … OK`.
+- **Decisión humana:** pendiente de verificación.
+- **Evidencia:** commit `feat: ayuda de unidades en cada seleccion de unidad`; pruebas `TestMenuInteractivo`.
+- **Correcciones:** no ocurrieron (funcionó de primera).
 
 ---
 

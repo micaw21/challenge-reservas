@@ -297,9 +297,18 @@ def _op_inventario(lab: Laboratorio, pedir) -> None:
     _pausa(pedir)
 
 
+def _ayuda_unidades(lab: Laboratorio) -> None:
+    """Lista las unidades disponibles junto al prompt de unidad."""
+    print("Unidades disponibles:")
+    for fila in lab.unidades():
+        print(f"  {fila['unidad']:<8} {fila['equipo']}")
+    print()
+
+
 def _op_listar(lab: Laboratorio, pedir) -> None:
     _limpiar()
-    print("--- LISTAR RESERVAS ---")
+    print("--- LISTAR RESERVAS ---\n")
+    _ayuda_unidades(lab)
     unidad = pedir("Filtrar por unidad (Enter = todas): ").strip()
     filas = lab.reservas(unidad or None)
     if not filas:
@@ -315,6 +324,7 @@ def _op_listar(lab: Laboratorio, pedir) -> None:
 def _op_disponibilidad(lab: Laboratorio, pedir) -> None:
     _limpiar()
     print("--- DISPONIBILIDAD --- (fecha y hora 'YYYY-MM-DD HH:MM')\n")
+    _ayuda_unidades(lab)
     try:
         estado, choque = lab.disponibilidad(
             pedir("  unidad: "),
@@ -337,6 +347,7 @@ def _op_disponibilidad(lab: Laboratorio, pedir) -> None:
 def _op_reservar(lab: Laboratorio, pedir) -> None:
     _limpiar()
     print("--- NUEVA RESERVA --- (fecha y hora 'YYYY-MM-DD HH:MM')\n")
+    _ayuda_unidades(lab)
     try:
         id_reserva = lab.reservar(
             pedir("  unidad: "),
