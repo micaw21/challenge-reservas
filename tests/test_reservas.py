@@ -312,6 +312,14 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(codigo, 0)
         self.assertEqual(salida, "(sin reservas registradas)")
 
+    def test_menu_sin_comando_sale_con_0(self) -> None:
+        # Correr sin argumentos muestra el menú de comandos en vez de un error.
+        codigo, salida = self._salida()
+        self.assertEqual(codigo, 0)
+        self.assertIn("Comandos disponibles", salida)
+        for comando in ("inventario", "listar", "disponibilidad", "reservar", "cancelar", "reset"):
+            self.assertIn(comando, salida)
+
     def test_ruta_db_por_defecto_vive_en_proyecto(self) -> None:
         from reservas import RUTA_DB
 

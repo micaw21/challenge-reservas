@@ -7,13 +7,14 @@ Sin dependencias externas: solo biblioteca estándar de Python (>= 3.11).
 
 Códigos de proceso: 0 = operación aceptada; 1 = operación rechazada
 (validación, unidad desconocida o superposición); 2 = uso incorrecto de la
-línea de comandos.
+línea de comandos. Al correr sin argumentos se muestra un menú de comandos.
 """
 
 from __future__ import annotations
 
 import argparse
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -252,7 +253,38 @@ def _imprimir_reservas(lab: Laboratorio, unidad: str | None) -> int:
     return 0
 
 
+def _imprimir_menu() -> None:
+    """Menú de comandos: se muestra al correr la app sin argumentos."""
+    print("Reservas de equipos de laboratorio")
+    print()
+    print("Uso: python .\\reservas.py <comando> [opciones]")
+    print("Datos persistentes: data/reservas.db")
+    print()
+    print("Comandos disponibles:")
+    print("  inventario       lista el inventario precargado")
+    print("  listar           historial de reservas (activas y canceladas)")
+    print("                   opcional: --unidad MIC-01")
+    print("  disponibilidad   consulta si un intervalo esta libre (LIBRE / OCUPADA)")
+    print("                   requiere: --unidad MIC-01 --desde ... --hasta ...")
+    print("  reservar         crea una reserva activa")
+    print("                   requiere: --unidad --solicitante --desde --hasta")
+    print("  cancelar         cancela conservando el registro (requiere --id N)")
+    print("  reset            reinicia los datos y resiembra el inventario")
+    print()
+    print("Fechas y horas en formato 'YYYY-MM-DD HH:MM'. Ejemplo:")
+    print('  python .\\reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A"')
+    print('                 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"')
+    print()
+    print("Códigos de proceso: 0 = aceptado, 1 = rechazado.")
+
+
 def main(argv: list[str] | None = None) -> int:
+    # Sin argumentos: menú de comandos en lugar del error en seco de argparse.
+    argumentos_externos = sys.argv[1:] if argv is None else argv
+    if not argumentos_externos:
+        _imprimir_menu()
+        return 0
+
     parser = argparse.ArgumentParser(
         prog="reservas",
         description=(
@@ -285,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("reset", help="reinicia los datos y resiembra el inventario")
 
-    argumentos = parser.parse_args(argv)
+    argumentos = parser.parse_args(argumentos_externos)
 
     if argumentos.comando == "reset":
         lab = Laboratorio(argumentos.db)

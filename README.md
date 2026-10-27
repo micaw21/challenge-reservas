@@ -144,6 +144,33 @@ python reservas.py cancelar --id 1                   # R-04: cancela conservando
 python reservas.py reset                             # reinicia datos y resiembra inventario
 ```
 
+**Correr sin comando** (`python reservas.py`) muestra un menú con todos los comandos y un ejemplo, y sale con código 0:
+
+```
+$ python reservas.py
+Reservas de equipos de laboratorio
+
+Uso: python .\reservas.py <comando> [opciones]
+Datos persistentes: data/reservas.db
+
+Comandos disponibles:
+  inventario       lista el inventario precargado
+  listar           historial de reservas (activas y canceladas)
+                   opcional: --unidad MIC-01
+  disponibilidad   consulta si un intervalo esta libre (LIBRE / OCUPADA)
+                   requiere: --unidad MIC-01 --desde ... --hasta ...
+  reservar         crea una reserva activa
+                   requiere: --unidad --solicitante --desde --hasta
+  cancelar         cancela conservando el registro (requiere --id N)
+  reset            reinicia los datos y resiembra el inventario
+
+Fechas y horas en formato 'YYYY-MM-DD HH:MM'. Ejemplo:
+  python .\reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A"
+                 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"
+
+Códigos de proceso: 0 = aceptado, 1 = rechazado.
+```
+
 Todas admiten `--db <ruta>` para opcionalmente usar otra base (útil en pruebas).
 
 **Pruebas:**
@@ -267,6 +294,8 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 1. Esqueleto del README + datos del agente (sección 3) | v0.1 | `README.md` (secciones creadas; 3 completada con datos del agente) | commit `4472118` — `docs: esqueleto del README y datos del agente (seccion 3)` |
 | 2. Especificación del challenge (sección 1) + stack definido (2.2) | v0.2 | `README.md` secciones 1 y 2 | commit `cf0637c` — `docs: especificacion (seccion 1), solucion (seccion 2) y registro de episodios (seccion 4)` |
 | 3. Implementación Python+SQLite, 32 pruebas y demo CLI (secciones 2.6/2.7) | v0.2 | `reservas.py`, `tests/test_reservas.py`, suite `unittest` en verde | commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas` |
+| 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
+| 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `c59fd75` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
 
 ---
 
@@ -284,6 +313,7 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 | D-04 | Superposición estricta implementada en Python (clase `Laboratorio`), no en SQL | Reglas V-1…V-9 en un solo lugar reutilizadas por `reservar` y `disponibilidad` (V-9); fáciles de testear | Query SQL con BETWEEN / paquete dedicado de calendarios | Riesgo de divergencia si mañana se consultara directamente por SQL; hoy no existe ese caso |
 | D-05 | Formato de fecha estricto `YYYY-MM-DD HH:MM` sin zonas horarias | Simplicidad y determinismo del caso local; evita ambigüedades de zonas | ISO con segundos / fechas con zona horaria (innecesarias) | Entradas con segundos u horas de zona se rechazan con mensaje claro |
 | D-06 | Salida ASCII en la CLI (p. ej. `->` en lugar de `→`) | Corregir bug real: la consola Windows (cp1252) no codifica flecha Unicode y `print` abortaba | Reconfigurar stdout a UTF-8 (depende de terminal) | Mensajes cortos y robustos en cualquier consola; se registró como corrección en el episodio 3 |
+| D-07 | `python reservas.py` sin argumentos muestra un menú de comandos (y sale 0) | El solicitante reportó que correr la app sin comando mostraba un error seco de argparse; el menú hace la app autoexplicativa para uso local | Dejar el error de argparse (código 2, más rígido); menú interactivo de selección (más código, no pedido) | La app corre con menú sin argumentos; los usos incorrectos con argumentos parcialmente dados siguen con error 2 de argparse |
 
 ### 4.2 Registro de episodios (delegación al agente)
 
@@ -319,6 +349,15 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Decisión humana:** pendiente de verificación.
 - **Evidencia:** commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas`; salida de `python -m unittest discover -s tests` → `Ran 32 tests … OK`; transcript del ejemplo completo capturado en la sección 2.7.
 - **Correcciones (ocurrieron):** (a) la CLI abortaba con `UnicodeEncodeError` en consola cp1252 por usar el carácter `→` en los mensajes: se corrigió usando flecha ASCII `->` (D-06). (b) La rama `reset` del CLI dejaba una conexión SQLite abierta (bloqueo al limpiar temporales en Windows): se corrigió cerrando explícitamente la conexión. Ambas correcciones quedaron en el mismo commit `79e2fb0` de la entrega.
+
+#### Episodio 4 — Menú de comandos al correr sin argumentos
+
+- **Objetivo y requisito:** hacer que `python .\reservas.py` sin comando muestre un menú de lo que se puede hacer, en lugar del error en seco de argparse (reporte del solicitante con su salida real).
+- **Contexto suministrado y extracto de instrucción:** *"al correr reservas.py agrega un menú de qué se puede hacer"* junto a la salida del error: `reservas: error: the following arguments are required: comando`.
+- **Acción o resultado del agente:** agregó `_imprimir_menu()` con los 6 comandos, sus opciones requeridas, la ruta de datos y un ejemplo de uso; `main` ahora muestra el menú y sale con código 0 cuando no hay argumentos (con argumentos incorrectos sigue el error 2 de argparse). Prueba nueva `test_menu_sin_comando_sale_con_0`; suite en 33 pruebas en verde. Se actualizó la sección 2.6 con la salida real del menú.
+- **Decisión humana:** pendiente de verificación.
+- **Evidencia:** commit de esta entrega (`feat: menu de comandos…`); salida del menú documentada en 2.6; suite `Ran 33 tests … OK`.
+- **Correcciones:** no ocurrieron (funcionó de primera).
 
 ---
 
