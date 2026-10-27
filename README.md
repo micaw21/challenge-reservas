@@ -120,7 +120,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 
 | Episodio | Versión | Evidencia | Enlace |
 |----------|---------|-----------|--------|
-| 1. Creación del esqueleto del README + carga de datos del agente (esta sección) | v0.1 | Commit del README | [`5f26b25`](https://example.com/replace-with-remote) |
+| 1. Creación del esqueleto del README + carga de datos del agente (esta sección) | v0.1 | `README.md` (secciones 1, 2, 3, 4 creadas; 3 completada con datos del agente) | commit `4472118` — `docs: esqueleto del README y datos del agente (seccion 3)` |
 
 ---
 
