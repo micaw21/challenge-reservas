@@ -295,7 +295,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 2. Especificación del challenge (sección 1) + stack definido (2.2) | v0.2 | `README.md` secciones 1 y 2 | commit `cf0637c` — `docs: especificacion (seccion 1), solucion (seccion 2) y registro de episodios (seccion 4)` |
 | 3. Implementación Python+SQLite, 32 pruebas y demo CLI (secciones 2.6/2.7) | v0.2 | `reservas.py`, `tests/test_reservas.py`, suite `unittest` en verde | commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas` |
 | 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
-| 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `c59fd75` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
+| 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
 
 ---
 
