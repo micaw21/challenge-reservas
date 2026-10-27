@@ -8,12 +8,15 @@ de modo que ninguna prueba contamina los datos de otra.
 from __future__ import annotations
 
 import io
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
-from reservas import Laboratorio, Rechazo, main
+import reservas
+from reservas import Laboratorio, Rechazo, _menu_interactivo, main
 
 MIC = "MIC-01"
 SOLICITANTE_A = "Solicitante A"
@@ -231,6 +234,99 @@ class TestReset(BaseLaboratorio):
         self.assertEqual(len(self.lab.unidades()), 5)
 
 
+class TestMenuInteractivo(unittest.TestCase):
+    """Bucle del menú: navegación, validación de opciones y salidas."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.ruta_db = str(Path(tmp.name) / "menu.db")
+
+    def _correr(self, respuestas: list[str]) -> int:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        return codigo
+
+    def test_salir_con_0_negativo_y_salir(self) -> None:
+        for respuestas in (["0"], ["-1"], ["/salir"], ["-3"]):
+            with self.subTest(respuestas=respuestas):
+                self.assertEqual(self._correr(respuestas), 0)
+
+    def test_opciones_fuera_de_navegacion_rechazadas(self) -> None:
+        for respuestas in (["zzz", "", "0"], ["abc", "", "-2"], ["7", "", "/salir"]):
+            with self.subTest(respuestas=respuestas):
+                self.assertEqual(self._correr(respuestas), 0)
+
+    def test_menu_muestra_opciones_numeradas(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=["0"]):
+            _menu_interactivo(self.ruta_db)
+        salida = buffer.getvalue()
+        self.assertIn("1) inventario", salida)
+        self.assertIn("6) reset", salida)
+        self.assertIn("0 | número negativo | /salir", salida)
+
+    def test_opcion_invalida_muestra_mensaje_y_repite_menu(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=["zzz", "", "0"]):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("Opción no válida: 'zzz'. Ingrese de nuevo.", salida)
+        # El menú se vuelve a mostrar tras el mensaje.
+        self.assertEqual(salida.count("RESERVAS DE EQUIPOS DE LABORATORIO"), 2)
+
+    def test_reservar_y_listar_desde_menu(self) -> None:
+        respuestas = [
+            "4",
+            MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00,
+            "",        # pausa tras crear
+            "2",       # listar: filtro vacío
+            "", "",    # pausa tras listar, vuelve al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("Reserva creada con id=1", salida)
+        self.assertIn(f"[ACTIVA] {MIC}", salida)
+        # La reserva quedó persistida en la base de ese menú.
+        lab = Laboratorio(self.ruta_db)
+        try:
+            self.assertEqual(len(lab.reservas()), 1)
+        finally:
+            lab.cerrar()
+
+    def test_reset_desde_menu_reinicia(self) -> None:
+        lab = Laboratorio(self.ruta_db)
+        lab.reservar(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
+        lab.cerrar()
+        respuestas = ["6", "s", "", "2", "", "", "0"]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        self.assertIn("Datos reiniciados", buffer.getvalue())
+
+    def test_reset_cancelado_no_modifica(self) -> None:
+        lab = Laboratorio(self.ruta_db)
+        lab.reservar(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
+        lab.cerrar()
+        respuestas = ["6", "n", "", "0"]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        lab = Laboratorio(self.ruta_db)
+        try:
+            self.assertEqual(len(lab.reservas()), 1)
+        finally:
+            lab.cerrar()
+
+
 class TestCLI(unittest.TestCase):
     """Verificación de la interfaz de comandos: textos y códigos de salida."""
 
@@ -311,14 +407,6 @@ class TestCLI(unittest.TestCase):
         codigo, salida = self._salida("--db", str(db), "listar")
         self.assertEqual(codigo, 0)
         self.assertEqual(salida, "(sin reservas registradas)")
-
-    def test_menu_sin_comando_sale_con_0(self) -> None:
-        # Correr sin argumentos muestra el menú de comandos en vez de un error.
-        codigo, salida = self._salida()
-        self.assertEqual(codigo, 0)
-        self.assertIn("Comandos disponibles", salida)
-        for comando in ("inventario", "listar", "disponibilidad", "reservar", "cancelar", "reset"):
-            self.assertIn(comando, salida)
 
     def test_ruta_db_por_defecto_vive_en_proyecto(self) -> None:
         from reservas import RUTA_DB

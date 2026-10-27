@@ -134,6 +134,29 @@ No se requiere `pip install`: no hay dependencias externas.
 
 ### 2.6 Comandos de aplicación y pruebas
 
+**Dos modos de uso:**
+
+**a) Modo interactivo** (correr sin comando: `python reservas.py`): bucle de menú con opciones `1`…`6`; se sale con `0`, cualquier número negativo o `/salir`. Los valores fuera de la navegación se rechazan con un mensaje y el menú se vuelve a mostrar. Cada opción limpia la pantalla y, cuando hace falta, pide sus datos como submenú (unidad, solicitante, fechas, id, confirmación de reset con `s/N`); después de cada operación espera Enter para volver.
+
+```
+=== RESERVAS DE EQUIPOS DE LABORATORIO ===
+Datos persistentes: data/reservas.db
+
+1) inventario       - lista el inventario precargado
+2) listar           - historial de reservas (activas y canceladas)
+3) disponibilidad   - LIBRE / OCUPADA en un intervalo
+4) reservar         - crea una reserva activa
+5) cancelar         - cancela conservando el registro
+6) reset            - reinicia los datos y resiembra el inventario
+
+0 | número negativo | /salir   - salir de la aplicación
+
+Uso directo por consola (sin menú):
+  python .\reservas.py inventario | listar | disponibilidad | reservar | cancelar | reset
+```
+
+**b) Modo por comandos** (cada comando sale según código de proceso):
+
 ```bash
 python reservas.py inventario                        # R-01: lista el inventario
 python reservas.py disponibilidad --unidad MIC-01 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"   # R-02
@@ -142,33 +165,6 @@ python reservas.py listar                            # R-04: historial completo 
 python reservas.py listar --unidad MIC-01            # historial de una unidad
 python reservas.py cancelar --id 1                   # R-04: cancela conservando id y datos
 python reservas.py reset                             # reinicia datos y resiembra inventario
-```
-
-**Correr sin comando** (`python reservas.py`) muestra un menú con todos los comandos y un ejemplo, y sale con código 0:
-
-```
-$ python reservas.py
-Reservas de equipos de laboratorio
-
-Uso: python .\reservas.py <comando> [opciones]
-Datos persistentes: data/reservas.db
-
-Comandos disponibles:
-  inventario       lista el inventario precargado
-  listar           historial de reservas (activas y canceladas)
-                   opcional: --unidad MIC-01
-  disponibilidad   consulta si un intervalo esta libre (LIBRE / OCUPADA)
-                   requiere: --unidad MIC-01 --desde ... --hasta ...
-  reservar         crea una reserva activa
-                   requiere: --unidad --solicitante --desde --hasta
-  cancelar         cancela conservando el registro (requiere --id N)
-  reset            reinicia los datos y resiembra el inventario
-
-Fechas y horas en formato 'YYYY-MM-DD HH:MM'. Ejemplo:
-  python .\reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A"
-                 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"
-
-Códigos de proceso: 0 = aceptado, 1 = rechazado.
 ```
 
 Todas admiten `--db <ruta>` para opcionalmente usar otra base (útil en pruebas).
@@ -296,6 +292,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 3. Implementación Python+SQLite, 32 pruebas y demo CLI (secciones 2.6/2.7) | v0.2 | `reservas.py`, `tests/test_reservas.py`, suite `unittest` en verde | commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas` |
 | 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
 | 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
+| 5. Menú interactivo en bucle (reemplaza el menú estático a partir del reporte del aplicante) | v0.4 | `reservas.py` (`_menu_interactivo`, submenús), sección 2.6a, suite en 39 pruebas | commit `feat: menu interactivo en bucle` (ver hash exacto en el log) |
 
 ---
 
@@ -314,6 +311,7 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 | D-05 | Formato de fecha estricto `YYYY-MM-DD HH:MM` sin zonas horarias | Simplicidad y determinismo del caso local; evita ambigüedades de zonas | ISO con segundos / fechas con zona horaria (innecesarias) | Entradas con segundos u horas de zona se rechazan con mensaje claro |
 | D-06 | Salida ASCII en la CLI (p. ej. `->` en lugar de `→`) | Corregir bug real: la consola Windows (cp1252) no codifica flecha Unicode y `print` abortaba | Reconfigurar stdout a UTF-8 (depende de terminal) | Mensajes cortos y robustos en cualquier consola; se registró como corrección en el episodio 3 |
 | D-07 | `python reservas.py` sin argumentos muestra un menú de comandos (y sale 0) | El solicitante reportó que correr la app sin comando mostraba un error seco de argparse; el menú hace la app autoexplicativa para uso local | Dejar el error de argparse (código 2, más rígido); menú interactivo de selección (más código, no pedido) | La app corre con menú sin argumentos; los usos incorrectos con argumentos parcialmente dados siguen con error 2 de argparse |
+| D-08 | El modo sin argumentos es un **menú interactivo en bucle** (opciones 1..6, submenús por opción, pantalla limpia en cada paso, salida con 0/negativo//salir) | El solicitante reportó que el menú estático "se cerraba a cada rato" y pidió selección numerada con validación de entradas | Menú estático del episodio 4 (descartado: no permite operar); pedir comandos en cada paso (menos control) | Experiencia REPL en consola; los comandos directos y sus códigos de proceso siguen igual; pruebas del menú usan entradas simuladas |
 
 ### 4.2 Registro de episodios (delegación al agente)
 
@@ -356,8 +354,17 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Contexto suministrado y extracto de instrucción:** *"al correr reservas.py agrega un menú de qué se puede hacer"* junto a la salida del error: `reservas: error: the following arguments are required: comando`.
 - **Acción o resultado del agente:** agregó `_imprimir_menu()` con los 6 comandos, sus opciones requeridas, la ruta de datos y un ejemplo de uso; `main` ahora muestra el menú y sale con código 0 cuando no hay argumentos (con argumentos incorrectos sigue el error 2 de argparse). Prueba nueva `test_menu_sin_comando_sale_con_0`; suite en 33 pruebas en verde. Se actualizó la sección 2.6 con la salida real del menú.
 - **Decisión humana:** pendiente de verificación.
-- **Evidencia:** commit de esta entrega (`feat: menu de comandos…`); salida del menú documentada en 2.6; suite `Ran 33 tests … OK`.
+- **Evidencia:** commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)`; salida del menú documentada en 2.6; suite `Ran 33 tests … OK`. *Nota: en v0.4 (episodio 5) este menú estático fue reemplazado por el modo interactivo (D-08).*
 - **Correcciones:** no ocurrieron (funcionó de primera).
+
+#### Episodio 5 — Menú interactivo en bucle (v0.4)
+
+- **Objetivo y requisito:** el menú estático del episodio 4 se cerraba tras mostrarlo; el solicitante pidió un bucle con opciones numeradas 1..6, submenús según la opción, pantalla limpia en cada paso, validación de entradas no válidas con mensaje y reintento, y salida con 0 / número negativo / `/salir`.
+- **Contexto suministrado y extracto de instrucción:** *"el menú se cierra a cada rato, la idea es que quede en un for y se pueda elegir la opcion 1 inventario 2 listar… y que se salga con algun numero negativo, 0 o con un /salir. valida que no se puedan ingresar otros valores que no sean los de navegacion del menu… cada vez que se entre en una opcion, pone submenu si es necesario pero limpia la pantalla"*.
+- **Acción o resultado del agente:** construyó `_menu_interactivo` (bucle con `match` de opciones 1..6), submenús por opción (listar con filtro opcional; disponibilidad/reservar con campos; cancelar valida id numérico antes de tocar la base; reset confirmado con s/N), `_limpiar()` al entrar a cada opción, rechazo de valores fuera de navegación ("Opción no válida… ingrese de nuevo", menú otra vez) y salidas por 0 / negativos / `/salir` (Ctrl+C/Ctrl+D cierran ordenadamente). El modo por comandos directos y sus códigos de proceso siguen igual. Pruebas nuevas `TestMenuInteractivo` con entradas simuladas y base temporal: salidas válidas, opciones inválidas, menú numerado, flujo reservar+listar con persistencia verificada, reset con y sin confirmación → `Ran 39 tests … OK`.
+- **Decisión humana:** pendiente de verificación.
+- **Evidencia:** commit `feat: menu interactivo en bucle…`; pruebas `TestMenuInteractivo`; modo documentado en 2.6a.
+- **Correcciones (ocurrieron):** (a) la primera secuencia de entradas de la prueba del flujo reservar+listar tenía una pausa menos que los prompts reales (falla de la prueba, no de la app; `StopIteration`) → corregida la secuencia; (b) dos pruebas de reset dejaban la conexión SQLite abierta y `tempfile` no podía borrar la base en Windows → se cierra explícitamente en las pruebas.
 
 ---
 

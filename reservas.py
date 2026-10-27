@@ -5,14 +5,16 @@ unidades de un inventario precargado, con historial persistente en SQLite.
 
 Sin dependencias externas: solo biblioteca estándar de Python (>= 3.11).
 
-Códigos de proceso: 0 = operación aceptada; 1 = operación rechazada
+Códigos de proceso (modo por comandos): 0 = aceptado; 1 = rechazado
 (validación, unidad desconocida o superposición); 2 = uso incorrecto de la
-línea de comandos. Al correr sin argumentos se muestra un menú de comandos.
+línea de comandos. Al correr sin argumentos se abre un menú interactivo que
+solo sale con 0, un número negativo o /salir.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
 from datetime import datetime
@@ -253,37 +255,176 @@ def _imprimir_reservas(lab: Laboratorio, unidad: str | None) -> int:
     return 0
 
 
+def _limpiar() -> None:
+    """Limpia la pantalla de la consola (cls en Windows, clear en otro SO)."""
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def _pausa(pedir) -> None:
+    pedir("\n(Enter para volver al menú) ")
+
+
+def _es_salida(texto: str) -> bool:
+    """La salida se acepta con 0, un número negativo o /salir."""
+    t = texto.strip().lower()
+    if t == "/salir" or t == "0":
+        return True
+    return len(t) > 1 and t.startswith("-") and t[1:].isdigit()
+
+
 def _imprimir_menu() -> None:
-    """Menú de comandos: se muestra al correr la app sin argumentos."""
-    print("Reservas de equipos de laboratorio")
-    print()
-    print("Uso: python .\\reservas.py <comando> [opciones]")
+    """Menú principal interactivo (opciones 1..6, salir con 0/-n//salir)."""
+    print("=== RESERVAS DE EQUIPOS DE LABORATORIO ===")
     print("Datos persistentes: data/reservas.db")
     print()
-    print("Comandos disponibles:")
-    print("  inventario       lista el inventario precargado")
-    print("  listar           historial de reservas (activas y canceladas)")
-    print("                   opcional: --unidad MIC-01")
-    print("  disponibilidad   consulta si un intervalo esta libre (LIBRE / OCUPADA)")
-    print("                   requiere: --unidad MIC-01 --desde ... --hasta ...")
-    print("  reservar         crea una reserva activa")
-    print("                   requiere: --unidad --solicitante --desde --hasta")
-    print("  cancelar         cancela conservando el registro (requiere --id N)")
-    print("  reset            reinicia los datos y resiembra el inventario")
+    print("1) inventario       - lista el inventario precargado")
+    print("2) listar           - historial de reservas (activas y canceladas)")
+    print("3) disponibilidad   - LIBRE / OCUPADA en un intervalo")
+    print("4) reservar         - crea una reserva activa")
+    print("5) cancelar         - cancela conservando el registro")
+    print("6) reset            - reinicia los datos y resiembra el inventario")
     print()
-    print("Fechas y horas en formato 'YYYY-MM-DD HH:MM'. Ejemplo:")
-    print('  python .\\reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A"')
-    print('                 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"')
+    print("0 | número negativo | /salir   - salir de la aplicación")
     print()
-    print("Códigos de proceso: 0 = aceptado, 1 = rechazado.")
+    print("Uso directo por consola (sin menú):")
+    print("  python .\\reservas.py inventario | listar | disponibilidad | reservar | cancelar | reset")
+
+
+def _op_inventario(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- INVENTARIO PRECARGADO ---\n")
+    _imprimir_unidades(lab)
+    _pausa(pedir)
+
+
+def _op_listar(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- LISTAR RESERVAS ---")
+    unidad = pedir("Filtrar por unidad (Enter = todas): ").strip()
+    filas = lab.reservas(unidad or None)
+    if not filas:
+        print("(sin reservas registradas)")
+    for fila in filas:
+        print(
+            f"id={fila['id']} [{fila['estado']}] {fila['unidad']}"
+            f" {fila['inicio']} -> {fila['fin']} '{fila['solicitante']}'"
+        )
+    _pausa(pedir)
+
+
+def _op_disponibilidad(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- DISPONIBILIDAD --- (fecha y hora 'YYYY-MM-DD HH:MM')\n")
+    try:
+        estado, choque = lab.disponibilidad(
+            pedir("  unidad: "),
+            pedir("  desde: "),
+            pedir("  hasta: "),
+        )
+    except Rechazo as error:
+        print(f"\nERROR: {error}")
+    else:
+        if estado == "LIBRE":
+            print("\nLIBRE")
+        else:
+            print(
+                f"\nOCUPADA: choca con reserva id={choque['id']} activa de"
+                f" '{choque['solicitante']}' {choque['inicio']} -> {choque['fin']}"
+            )
+    _pausa(pedir)
+
+
+def _op_reservar(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- NUEVA RESERVA --- (fecha y hora 'YYYY-MM-DD HH:MM')\n")
+    try:
+        id_reserva = lab.reservar(
+            pedir("  unidad: "),
+            pedir("  solicitante: "),
+            pedir("  desde: "),
+            pedir("  hasta: "),
+        )
+    except Rechazo as error:
+        print(f"\nERROR: {error}")
+    else:
+        print(f"\nReserva creada con id={id_reserva}.")
+    _pausa(pedir)
+
+
+def _op_cancelar(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- CANCELAR RESERVA ---\n")
+    texto = pedir("  id de la reserva: ").strip()
+    # Validación del dato numérico ANTES de tocar la base de datos.
+    if not texto.isdigit():
+        print("\nERROR: el id debe ser un número entero (sin signo).")
+    else:
+        try:
+            fila = lab.cancelar(int(texto))
+        except Rechazo as error:
+            print(f"\nERROR: {error}")
+        else:
+            print(
+                f"\nReserva id={fila['id']} cancelada (registro conservado:"
+                f" {fila['unidad']} {fila['inicio']} -> {fila['fin']}"
+                f" '{fila['solicitante']}')."
+            )
+    _pausa(pedir)
+
+
+def _op_reset(lab: Laboratorio, pedir) -> None:
+    _limpiar()
+    print("--- REINICIAR DATOS ---\n")
+    respuesta = pedir("¿Seguro que desea reiniciar? (s/N): ").strip().lower()
+    if respuesta == "s":
+        lab.reset()
+        print("\nDatos reiniciados: inventario resiembado y reservas eliminadas.")
+    else:
+        print("\nOperación cancelada: no se modificó nada.")
+    _pausa(pedir)
+
+
+def _menu_interactivo(db: str | Path = RUTA_DB, entrada=None) -> int:
+    """Bucle del menú: se repite hasta elegir 0, un negativo o /salir."""
+    pedir = entrada if entrada is not None else input
+    lab = Laboratorio(db)
+    try:
+        while True:
+            _limpiar()
+            _imprimir_menu()
+            eleccion = pedir("Elija una opción: ").strip()
+            if _es_salida(eleccion):
+                return 0
+            match eleccion:
+                case "1":
+                    _op_inventario(lab, pedir)
+                case "2":
+                    _op_listar(lab, pedir)
+                case "3":
+                    _op_disponibilidad(lab, pedir)
+                case "4":
+                    _op_reservar(lab, pedir)
+                case "5":
+                    _op_cancelar(lab, pedir)
+                case "6":
+                    _op_reset(lab, pedir)
+                case _:
+                    # Cualquier valor fuera de la navegación se rechaza y
+                    # vuelve a mostrar el menú.
+                    print(f"\nOpción no válida: '{eleccion}'. Ingrese de nuevo.")
+                    _pausa(pedir)
+    except (EOFError, KeyboardInterrupt):
+        # Cerrar ordenadamente con Ctrl+D / Ctrl+C.
+        return 0
+    finally:
+        lab.cerrar()
 
 
 def main(argv: list[str] | None = None) -> int:
-    # Sin argumentos: menú de comandos en lugar del error en seco de argparse.
+    # Sin argumentos: menú interactivo; con argumentos: uso directo por comandos.
     argumentos_externos = sys.argv[1:] if argv is None else argv
     if not argumentos_externos:
-        _imprimir_menu()
-        return 0
+        return _menu_interactivo()
 
     parser = argparse.ArgumentParser(
         prog="reservas",
