@@ -293,7 +293,7 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
 | 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
 | 5. Menú interactivo en bucle (reemplaza el menú estático a partir del reporte del aplicante) | v0.4 | `reservas.py` (`_menu_interactivo`, submenús), sección 2.6a, suite en 39 pruebas | commit `809e899` — `feat: menu interactivo en bucle (submenus, valida entradas, sale 0/-n//salir)` |
-| 6. Ayuda de unidades en cada selección de unidad (listar/disponibilidad/reservar) | v0.5 | `reservas.py` (`_ayuda_unidades`), suite en 40 pruebas | commit `feat: ayuda de unidades en cada seleccion` |
+| 6. Ayuda de unidades en cada selección de unidad (listar/disponibilidad/reservar) | v0.5 | `reservas.py` (`_ayuda_unidades`), suite en 40 pruebas | commit `bd93dd2` — `feat: ayuda de unidades en cada seleccion de unidad (menu interactivo)` |
 
 ---
 
