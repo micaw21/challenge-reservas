@@ -1,7 +1,7 @@
 # Challenge
 
-> **Estado:** aplicación funcional y documentación parcialmente verificada (secciones 1–4 completas;
-> algunas verificaciones humanas de los episodios quedan pendientes, ver 4.2).
+> **Estado:** aplicación funcional y documentada. Episodios 1–6 **aceptados** por el solicitante;
+> episodio 7 (v0.6) pendiente de commit y decisión humana final (ver 4.2).
 > El repositorio debe explicar por sí solo **qué se construyó y cómo se comprobó**.
 
 ---
@@ -59,7 +59,7 @@ Inventario (ya definido):
 |-------|-----------|
 | V-1 | Se rechaza cualquier operación sobre una **unidad desconocida** (no está en el inventario). |
 | V-2 | El **solicitante** no puede ser vacío ni estar compuesto solo por espacios. |
-| V-3 | Las **fechas y horas** deben ser válidas (formato `YYYY-MM-DD HH:MM`). |
+| V-3 | Las **fechas y horas** deben ser válidas (formato canónico `DD-MM-YYYY HH:MM`; el ISO `YYYY-MM-DD HH:MM` sigue aceptado por compatibilidad). |
 | V-4 | El **inicio debe ser estrictamente anterior al fin**. |
 | V-5 | Una reserva **activa** ocupa su intervalo; una **cancelada** no bloquea disponibilidad, pero se conserva con sus datos. |
 | V-6 | Se rechaza la **superposición de reservas activas de la misma unidad**. |
@@ -71,7 +71,7 @@ Ejemplo del enunciado: con MIC-01 reservado de 10:00 a 11:00, se rechaza 10:30�
 
 ### 1.5 Supuestos
 
-- Las fechas/horas son locales y sin zona horaria; formato de entrada `YYYY-MM-DD HH:MM`.
+- Las fechas/horas son locales y sin zona horaria; formato visible y de entrada preferido `DD-MM-YYYY HH:MM` (solicitado en el episodio 7); el ISO `YYYY-MM-DD HH:MM` sigue aceptado. El almacenamiento interno queda en ISO.
 - Una reserva ocupa **una sola unidad** (suficiente según el enunciado).
 - El inventario es estático: está definido y no crece ni se edita desde la aplicación.
 - Los datos de mensajes/planilla actuales se cargan manualmente si se desea; no hay importación.
@@ -85,7 +85,7 @@ Ejemplo del enunciado: con MIC-01 reservado de 10:00 a 11:00, se rechaza 10:30�
 | CA-02 | El ejemplo del enunciado (V-6/V-7/V-8 con MIC-01/MIC-02) se reproduce exactamente: rechaza 10:30–11:30, permite 11:00–12:00 y MIC-02 10:00–11:00. |
 | CA-03 | Una cancelación conserva id y datos en `listar` y libera el intervalo para una nueva reserva. |
 | CA-04 | Tras cerrar y reabrir la aplicación, reservas y estados se recuperan. |
-| CA-05 | `python -m unittest discover -s tests` pasa sin errores (32 pruebas). |
+| CA-05 | `python -m unittest discover -s tests` pasa sin errores (54 pruebas). |
 
 ---
 
@@ -97,7 +97,7 @@ Ejemplo del enunciado: con MIC-01 reservado de 10:00 a 11:00, se rechaza 10:30�
 challenge/
 ├── reservas.py           # Aplicación: API y CLI (módulo único, sin dependencias)
 ├── tests/
-│   └── test_reservas.py  # 32 pruebas (unittest, biblioteca estándar)
+│   └── test_reservas.py  # pruebas de unittest (45, biblioteca estándar)
 ├── data/
 │   └── reservas.db       # Base SQLite (se crea al primer arranque; no se versiona)
 └── README.md
@@ -136,31 +136,30 @@ No se requiere `pip install`: no hay dependencias externas.
 
 **Dos modos de uso:**
 
-**a) Modo interactivo** (correr sin comando: `python reservas.py`): bucle de menú con opciones `1`…`6`; se sale con `0`, cualquier número negativo o `/salir`. Los valores fuera de la navegación se rechazan con un mensaje y el menú se vuelve a mostrar. Cada opción limpia la pantalla y, cuando hace falta, pide sus datos como submenú (unidad, solicitante, fechas, id, confirmación de reset con `s/N`); después de cada operación espera Enter para volver. Cada vez que la app pide una unidad (listar con filtro, disponibilidad, reservar) muestra primero las unidades disponibles del inventario como ayuda:
+**a) Modo interactivo** (correr sin comando: `python reservas.py`): bucle de menú con opciones `1`…`6`; se sale con `0`, cualquier número negativo o `/salir`. Los valores fuera de la navegación se rechazan con un mensaje y el menú se vuelve a mostrar. Cada opción limpia la pantalla y, cuando hace falta, pide sus datos como submenú con pedidos instructivos (`Ingrese tal cosa (ej.: MIC-01)`). **Toda unidad, id o dato se valida al momento de pedirse**: si el dato está mal (unidad desconocida, solicitante vacío, fecha o hora inválidas, intervalo con orden invertido, id no numérico o de reserva inexistente) se muestra el error y **solo ese campo** se vuelve a pedir — nunca desde el comienzo de la opción; en cancelar, Enter deja la opción sin cancelar nada. La disponibilidad pide la **fecha una sola vez** y las **horas de inicio y fin por separado** (`HH:MM`), mientras que la reserva mantiene el formato completo `DD-MM-YYYY HH:MM` en un solo pedido; al terminar las operaciones de consulta o modificación pregunta si repetir esa misma opción o volver al menú (`s = sí, repetir aquí / Enter = volver al menú`; el inventario solo muestra su pantalla y espera Enter, y el `reset` conserva su confirmación propia `s/N` y su pausa, por ser destructivo). Cada vez que la app pide una unidad (listar con filtro, disponibilidad, reservar) muestra primero las unidades disponibles del inventario como ayuda:
 
 ```
 === RESERVAS DE EQUIPOS DE LABORATORIO ===
-Datos persistentes: data/reservas.db
 
-1) inventario       - lista el inventario precargado
-2) listar           - historial de reservas (activas y canceladas)
-3) disponibilidad   - LIBRE / OCUPADA en un intervalo
-4) reservar         - crea una reserva activa
-5) cancelar         - cancela conservando el registro
-6) reset            - reinicia los datos y resiembra el inventario
+  1) Ver inventario
+  2) Ver historial de reservas
+  3) Consultar disponibilidad
+  4) Crear una reserva
+  5) Cancelar una reserva
+  6) Reiniciar los datos (borra las reservas)
 
-0 | número negativo | /salir   - salir de la aplicación
-
-Uso directo por consola (sin menú):
-  python .\reservas.py inventario | listar | disponibilidad | reservar | cancelar | reset
+  0) Salir  (también: un número negativo o /salir)
+Elija una opción (0-6): 
 ```
+
+Los usos directos por consola (`python .\reservas.py inventario | listar | ...`) siguen disponibles y están detallados en el punto b.
 
 **b) Modo por comandos** (cada comando sale según código de proceso):
 
 ```bash
 python reservas.py inventario                        # R-01: lista el inventario
-python reservas.py disponibilidad --unidad MIC-01 --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"   # R-02
-python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A" --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"  # R-03
+python reservas.py disponibilidad --unidad MIC-01 --desde "03-11-2026 10:00" --hasta "03-11-2026 11:00"   # R-02
+python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A" --desde "03-11-2026 10:00" --hasta "03-11-2026 11:00"  # R-03
 python reservas.py listar                            # R-04: historial completo (incluye canceladas)
 python reservas.py listar --unidad MIC-01            # historial de una unidad
 python reservas.py cancelar --id 1                   # R-04: cancela conservando id y datos
@@ -175,7 +174,7 @@ Todas admiten `--db <ruta>` para opcionalmente usar otra base (útil en pruebas)
 python -m unittest discover -s tests
 ```
 
-32 pruebas en verde = estado aceptado (CA-05). Códigos de proceso: `0` aceptado, `1` rechazado.
+54 pruebas en verde = estado aceptado (CA-05). Códigos de proceso: `0` aceptado, `1` rechazado.
 
 ### 2.7 Ejemplos de entrada y salida
 
@@ -184,37 +183,37 @@ python -m unittest discover -s tests
 **Secuencia del ejemplo del enunciado (CA-02):** MIC-01 es reservado de 10:00 a 11:00 por Solicitante A:
 
 ```
-$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A" --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"
+$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante A" --desde "03-11-2026 10:00" --hasta "03-11-2026 11:00"
 Reserva creada con id=1.
 ```
 
 Consultar 10:30→11:30 sobre MIC-01 se rechaza porque choca (V-6):
 
 ```
-$ python reservas.py disponibilidad --unidad MIC-01 --desde "2026-11-03 10:30" --hasta "2026-11-03 11:30"
-OCUPADA: MIC-01 2026-11-03 10:30 -> 2026-11-03 11:30 (choca con reserva id=1 activa de 'Solicitante A' 2026-11-03 10:00 -> 2026-11-03 11:00)
+$ python reservas.py disponibilidad --unidad MIC-01 --desde "03-11-2026 10:30" --hasta "03-11-2026 11:30"
+OCUPADA: MIC-01 03-11-2026 10:30 -> 03-11-2026 11:30 (choca con reserva id=1 activa de 'Solicitante A' 03-11-2026 10:00 -> 03-11-2026 11:00)
 # código de proceso: 1
 ```
 
 Reservar ese intervalo igualmente se rechaza:
 
 ```
-$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante B" --desde "2026-11-03 10:30" --hasta "2026-11-03 11:30"
-ERROR: unidad MIC-01 ya reservada por 'Solicitante A' de 2026-11-03 10:00 a 2026-11-03 11:00 (reserva id=1, activa)
+$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante B" --desde "03-11-2026 10:30" --hasta "03-11-2026 11:30"
+ERROR: unidad MIC-01 ya reservada por 'Solicitante A' de 03-11-2026 10:00 a 03-11-2026 11:00 (reserva id=1, activa)
 # código de proceso: 1
 ```
 
 Con límite consecutivo **11:00→12:00** se permite (V-7):
 
 ```
-$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante B" --desde "2026-11-03 11:00" --hasta "2026-11-03 12:00"
+$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante B" --desde "03-11-2026 11:00" --hasta "03-11-2026 12:00"
 Reserva creada con id=2.
 ```
 
 Otra unidad distinta puede reservarse en el mismo intervalo (V-8):
 
 ```
-$ python reservas.py reservar --unidad MIC-02 --solicitante "Solicitante C" --desde "2026-11-03 10:00" --hasta "2026-11-03 11:00"
+$ python reservas.py reservar --unidad MIC-02 --solicitante "Solicitante C" --desde "03-11-2026 10:00" --hasta "03-11-2026 11:00"
 Reserva creada con id=3.
 ```
 
@@ -222,28 +221,28 @@ Cancelar conserva el registro y libera el intervalo (V-5):
 
 ```
 $ python reservas.py cancelar --id 1
-Reserva id=1 cancelada (registro conservado: MIC-01 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante A').
+Reserva id=1 cancelada (registro conservado: MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00 'Solicitante A').
 ```
 
 **Estado final visible con `listar`:**
 
 ```
-id=1 [CANCELADA] MIC-01 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante A'
-id=2 [ACTIVA] MIC-01 2026-11-03 11:00 -> 2026-11-03 12:00 'Solicitante B'
-id=3 [ACTIVA] MIC-02 2026-11-03 10:00 -> 2026-11-03 11:00 'Solicitante C'
+id=1 [CANCELADA] MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00 'Solicitante A'
+id=2 [ACTIVA] MIC-01 03-11-2026 11:00 -> 03-11-2026 12:00 'Solicitante B'
+id=3 [ACTIVA] MIC-02 03-11-2026 10:00 -> 03-11-2026 11:00 'Solicitante C'
 ```
 
 **Casos de rechazo por validación (V-1…V-4):**
 
 ```
-$ python reservas.py reservar --unidad XXX-99 --solicitante "Solicitante X" --desde "2026-11-03 09:00" --hasta "2026-11-03 10:00"
+$ python reservas.py reservar --unidad XXX-99 --solicitante "Solicitante X" --desde "03-11-2026 09:00" --hasta "03-11-2026 10:00"
 ERROR: unidad desconocida: 'XXX-99' (conocidas: FUE-01, MIC-01, MIC-02, MUL-01, OSC-01)
 
-$ python reservas.py reservar --unidad MIC-01 --solicitante "   " --desde "2026-11-03 09:00" --hasta "2026-11-03 10:00"
+$ python reservas.py reservar --unidad MIC-01 --solicitante "   " --desde "03-11-2026 09:00" --hasta "03-11-2026 10:00"
 ERROR: solicitante vacío: la reserva necesita un solicitante
 
-$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante X" --desde "ayer" --hasta "2026-11-03 10:00"
-ERROR: fecha y hora inválidas: 'ayer' (se espera 'YYYY-MM-DD HH:MM')
+$ python reservas.py reservar --unidad MIC-01 --solicitante "Solicitante X" --desde "ayer" --hasta "03-11-2026 10:00"
+ERROR: fecha y hora inválidas: 'ayer' (se espera 'DD-MM-YYYY HH:MM')
 ```
 
 ---
@@ -290,10 +289,11 @@ Vincular la evidencia con la **versión entregada**. No adjuntar transcripciones
 | 1. Esqueleto del README + datos del agente (sección 3) | v0.1 | `README.md` (secciones creadas; 3 completada con datos del agente) | commit `4472118` — `docs: esqueleto del README y datos del agente (seccion 3)` |
 | 2. Especificación del challenge (sección 1) + stack definido (2.2) | v0.2 | `README.md` secciones 1 y 2 | commit `cf0637c` — `docs: especificacion (seccion 1), solucion (seccion 2) y registro de episodios (seccion 4)` |
 | 3. Implementación Python+SQLite, 32 pruebas y demo CLI (secciones 2.6/2.7) | v0.2 | `reservas.py`, `tests/test_reservas.py`, suite `unittest` en verde | commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas` |
-| 3b. Comentarios legibles + fix de anotación y espacio en `listar` | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
+| 3b. Comentarios legibles + fix de anotación y espacio en `listar` (aceptado por el solicitante, oct. 2026) | v0.2 | suite sigue en verde tras el refactor | commit `4d4af71` — `refactor: comentarios y docstrings vinculados a requisitos; fix typo anotacion _unidad y espacio en listar` |
 | 4. Menú de comandos al correr sin argumentos (solicitud del aplicante sobre la salida real del error) | v0.3 | `reservas.py` (`_imprimir_menu`), sección 2.6, suite en 33 pruebas | commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)` |
 | 5. Menú interactivo en bucle (reemplaza el menú estático a partir del reporte del aplicante) | v0.4 | `reservas.py` (`_menu_interactivo`, submenús), sección 2.6a, suite en 39 pruebas | commit `809e899` — `feat: menu interactivo en bucle (submenus, valida entradas, sale 0/-n//salir)` |
 | 6. Ayuda de unidades en cada selección de unidad (listar/disponibilidad/reservar) | v0.5 | `reservas.py` (`_ayuda_unidades`), suite en 40 pruebas | commit `bd93dd2` — `feat: ayuda de unidades en cada seleccion de unidad (menu interactivo)` |
+| 7. Menú friendly + bucle de repetición por opción + prompts instructivos + fechas DD-MM-YYYY | v0.6 | `reservas.py` (menú simplificado, `_volver_o_repetir`, `_consultar`, `_mostrar`, `_pedir_unidad`), README 2.6a/2.7/1.4, suite en 54 pruebas | commit pendiente de cierre del episodio |
 
 ---
 
@@ -314,6 +314,8 @@ Registro de decisiones significativas, con motivo, alternativas evaluadas (cuand
 | D-07 | `python reservas.py` sin argumentos muestra un menú de comandos (y sale 0) | El solicitante reportó que correr la app sin comando mostraba un error seco de argparse; el menú hace la app autoexplicativa para uso local | Dejar el error de argparse (código 2, más rígido); menú interactivo de selección (más código, no pedido) | La app corre con menú sin argumentos; los usos incorrectos con argumentos parcialmente dados siguen con error 2 de argparse |
 | D-08 | El modo sin argumentos es un **menú interactivo en bucle** (opciones 1..6, submenús por opción, pantalla limpia en cada paso, salida con 0/negativo//salir) | El solicitante reportó que el menú estático "se cerraba a cada rato" y pidió selección numerada con validación de entradas | Menú estático del episodio 4 (descartado: no permite operar); pedir comandos en cada paso (menos control) | Experiencia REPL en consola; los comandos directos y sus códigos de proceso siguen igual; pruebas del menú usan entradas simuladas |
 | D-09 | Mostrar las **unidades disponibles como ayuda** junto a cada prompt de unidad (listar con filtro, disponibilidad, reservar) | El solicitante pidió ayuda de unidades en cada selección; reduce errores de tipeo sin consultar el inventario aparte | No mostrar nada (depende de memoria del usuario); menú numerado de unidades (cambia el diseño de navegación pedido) | La lista del inventario se imprime en cada submenú de unidad; una unidad desconocida sigue rechazándose con la lista de unidades conocidas |
+| D-10 | Formato de fecha visible **`DD-MM-YYYY HH:MM`** (entrada preferida y toda la salida); el ISO `YYYY-MM-DD HH:MM` sigue aceptado para comandos y compatibilidad | El solicitante pidió todas las fechas en DD-MM-YYYY; se mantiene el almacenamiento interno en ISO para no romper órdenes, comparaciones ni el historial ya persistido | Cambiar también el almacenamiento (requeriría migración sin beneficio); rechazar el ISO (rompería los ejemplos documentados y usos previos) | Fuera de la app las fechas se ven DD-MM-YYYY; en la base quedan ISO; prompts por partes en disponibilidad (fecha una vez, horas por separado) |
+| D-11 | Tras cada operación el menú pregunta **repetir la misma opción o volver al menú** (`s` / Enter), con prompts instructivos (`Ingrese tal cosa (ej.: …)`) | El solicitante pidió ese bucle y pedidos más explícitos al pedir datos | Volver directo al menú tras cada operación (comportamiento previo, más pasos para consultas repetidas) | Las opciones 1–5 se repiten internamente; el `reset` conserva su confirmación `s/N` propia (destructivo); los prompts se imprimen por `print` para poder verificarlos en pruebas |
 
 ### 4.2 Registro de episodios (delegación al agente)
 
@@ -339,16 +341,16 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Objetivo y requisito:** cargar en el README la especificación del challenge (problema, alcance, reglas mínimas y ejemplo MIC-01) según el enunciado dado por el solicitante.
 - **Contexto suministrado y resumen de la instrucción:** construir una solución local pequeña y verificable para la coordinación de un laboratorio (consultar disponibilidad, reservar y cancelar sin perder historial), con alcance y reglas mínimas descritos en el enunciado, avance con Python + SQLite, y tabla de inventario de 5 unidades adjunta como imagen.
 - **Acción o resultado del agente:** completó la sección 1 del README (problema, alcance in/out, R-01…R-06, reglas V-1…V-9 con el ejemplo del enunciado, supuestos, CA-01…CA-05) y dejó definida la sección 2.2 con el stack elegido.
-- **Decisión humana:** pendiente de verificación.
+- **Decisión humana:** **aceptar** — confirmado por el solicitante en octubre de 2026, la especificación refleja el enunciado.
 - **Evidencia:** `README.md` sección 1, commit `cf0637c`.
-- **Correcciones:** ninguna (aún no verificada).
+- **Correcciones:** ninguna.
 
 #### Episodio 3 — Implementación y verificación (cuarta entrega del episodio en un único ciclo delegado)
 
 - **Objetivo y requisito:** construir la solución Python + SQLite local con reglas V-1…V-9 y persistencia (R-01…R-06), con pruebas automatizadas.
 - **Contexto suministrado y resumen de la instrucción:** implementar la especificación del episodio 2 con el stack indicado (Python + SQLite).
 - **Acción o resultado del agente:** escribió `reservas.py` (API `Laboratorio` + CLI de 6 comandos con códigos de proceso) y `tests/test_reservas.py` (32 pruebas de unittest) que cubren inventario precargado, superposición estricta, límites consecutivos, unidades distintas, cancelación conservando datos, persistencia al reiniciar, reset y validaciones. Demostración CLI end‑to‑end de la secuencia del ejemplo de MIC‑01 (ver sección 2.7) con los códigos de proceso correctos. Datos persistidos en `data/reservas.db` (no versionado); base reiniciada con `reset` al final para dejar datos limpios.
-- **Decisión humana:** pendiente de verificación.
+- **Decisión humana:** **aceptar** — confirmado por el solicitante en octubre de 2026; la app cumple R-01…R-06 y el ejemplo de sección 2.7.
 - **Evidencia:** commit `79e2fb0` — `feat: app de reservas (Python+stdlib/SQLite) con CLI y 32 pruebas`; salida de `python -m unittest discover -s tests` → `Ran 32 tests … OK`; transcript del ejemplo completo capturado en la sección 2.7.
 - **Correcciones (ocurrieron):** (a) la CLI abortaba con `UnicodeEncodeError` en consola cp1252 por usar el carácter `→` en los mensajes: se corrigió usando flecha ASCII `->` (D-06). (b) La rama `reset` del CLI dejaba una conexión SQLite abierta (bloqueo al limpiar temporales en Windows): se corrigió cerrando explícitamente la conexión. Ambas correcciones quedaron en el mismo commit `79e2fb0` de la entrega.
 
@@ -357,7 +359,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Objetivo y requisito:** hacer que `python .\reservas.py` sin comando muestre un menú de lo que se puede hacer, en lugar del error en seco de argparse (reporte del solicitante con su salida real).
 - **Contexto suministrado y resumen de la instrucción:** al correr `reservas.py` sin comando, mostrar un menú de lo que se puede hacer en lugar del error en seco de argparse; el solicitante adjuntó la salida real del error (`reservas: error: the following arguments are required: comando`).
 - **Acción o resultado del agente:** agregó `_imprimir_menu()` con los 6 comandos, sus opciones requeridas, la ruta de datos y un ejemplo de uso; `main` ahora muestra el menú y sale con código 0 cuando no hay argumentos (con argumentos incorrectos sigue el error 2 de argparse). Prueba nueva `test_menu_sin_comando_sale_con_0`; suite en 33 pruebas en verde. Se actualizó la sección 2.6 con la salida real del menú.
-- **Decisión humana:** pendiente de verificación.
+- **Decisión humana:** **aceptar** — confirmado por el solicitante en octubre de 2026; quedó registrado y luego reemplazado por el episodio 5.
 - **Evidencia:** commit `2cbf694` — `feat: menu de comandos al correr sin argumentos (sale 0, ver 2.6)`; salida del menú documentada en 2.6; suite `Ran 33 tests … OK`. *Nota: en v0.4 (episodio 5) este menú estático fue reemplazado por el modo interactivo (D-08).*
 - **Correcciones:** no ocurrieron (funcionó de primera).
 
@@ -366,7 +368,7 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Objetivo y requisito:** el menú estático del episodio 4 se cerraba tras mostrarlo; el solicitante pidió un bucle con opciones numeradas 1..6, submenús según la opción, pantalla limpia en cada paso, validación de entradas no válidas con mensaje y reintento, y salida con 0 / número negativo / `/salir`.
 - **Contexto suministrado y resumen de la instrucción:** el menú se cerraba tras cada acción; el solicitante pidió un bucle con opciones numeradas (1 inventario, 2 listar…), salida con 0 / número negativo / `/salir`, validación de valores fuera de la navegación con mensaje y reintento mostrando el menú otra vez, y submenús con limpiar pantalla al entrar en cada opción.
 - **Acción o resultado del agente:** construyó `_menu_interactivo` (bucle con `match` de opciones 1..6), submenús por opción (listar con filtro opcional; disponibilidad/reservar con campos; cancelar valida id numérico antes de tocar la base; reset confirmado con s/N), `_limpiar()` al entrar a cada opción, rechazo de valores fuera de navegación ("Opción no válida… ingrese de nuevo", menú otra vez) y salidas por 0 / negativos / `/salir` (Ctrl+C/Ctrl+D cierran ordenadamente). El modo por comandos directos y sus códigos de proceso siguen igual. Pruebas nuevas `TestMenuInteractivo` con entradas simuladas y base temporal: salidas válidas, opciones inválidas, menú numerado, flujo reservar+listar con persistencia verificada, reset con y sin confirmación → `Ran 39 tests … OK`.
-- **Decisión humana:** pendiente de verificación.
+- **Decisión humana:** **aceptar** — confirmado por el solicitante en octubre de 2026; el modo interactivo reemplaza al menú estático.
 - **Evidencia:** commit `feat: menu interactivo en bucle…`; pruebas `TestMenuInteractivo`; modo documentado en 2.6a.
 - **Correcciones (ocurrieron):** (a) la primera secuencia de entradas de la prueba del flujo reservar+listar tenía una pausa menos que los prompts reales (falla de la prueba, no de la app; `StopIteration`) → corregida la secuencia; (b) dos pruebas de reset dejaban la conexión SQLite abierta y `tempfile` no podía borrar la base en Windows → se cierra explícitamente en las pruebas.
 
@@ -375,9 +377,18 @@ Correcciones: registrar **solo si ocurrieron**; no inventar fallas.
 - **Objetivo y requisito:** que cada vez que el menú pida una unidad (listar con filtro, disponibilidad, reservar) se muestren las unidades disponibles como ayuda.
 - **Contexto suministrado y resumen de la instrucción:** en cada selección de unidad (listar con filtro, disponibilidad, reservar), mostrar las unidades disponibles como ayuda antes del prompt.
 - **Acción o resultado del agente:** agregó `_ayuda_unidades()` (ID alineado a 8 + equipo) invocada en los tres submenús que piden unidad. Prueba nueva `test_listar_muestra_unidades_como_ayuda` (la ayuda aparece tras el encabezado de listar y antes de los datos, con las 5 unidades y sus equipos) y aserción en el flujo reservar+listar (ayuda al reservar y al filtrar) → `Ran 40 tests … OK`.
-- **Decisión humana:** pendiente de verificación.
+- **Decisión humana:** **aceptar** — confirmado por el solicitante en octubre de 2026; la ayuda de unidades quedó en los tres submenús.
 - **Evidencia:** commit `feat: ayuda de unidades en cada seleccion de unidad`; pruebas `TestMenuInteractivo`.
 - **Correcciones:** no ocurrieron (funcionó de primera).
+
+#### Episodio 7 — Menú friendly, bucle de repetición y fechas DD-MM-YYYY (v0.6)
+
+- **Objetivo y requisito:** simplificar el menú principal (quitar "Datos persistentes" y el anuncio del uso por consola, redactar opciones como acciones), preguntar tras cada operación si repetir esa misma opción o volver al menú, hacer los pedidos de datos instructivos, separar la consulta de disponibilidad en fecha + horas, y usar el formato `DD-MM-YYYY` en todas las fechas.
+- **Contexto suministrado y resumen de la instrucción:** (a) mejorar el menú quitando datos innecesarios y hacerlo amigable; (b) tras terminar una opción, preguntar si se hace otra consulta dentro de la misma opción o se vuelve al menú; (c) pedir datos con "Ingrese tal cosa (ej.: …)" en lugar de etiquetas cortas; (d) en disponibilidad, pedir la fecha primero y las horas después por separado; (e) todas las fechas en formato DD-MM-YYYY.
+- **Acción o resultado del agente:** rediseñó `_imprimir_menu` (opciones como "Ver inventario"/"Crear una reserva", salida `0)` como opción); agregó `_volver_o_repetir` (bucle interno en las opciones que operan datos — listar, disponibilidad, reservar, cancelar; el inventario solo muestra su pantalla y espera Enter, y el `reset` conserva su `s/N` y pausa propia por ser destructivo) y `_consultar` (prompts impresos por `print` para que queden capturables en pruebas); pedidos con instrucción y ejemplo; disponibilidad ahora pide unidad → fecha (`DD-MM-YYYY`) → hora inicio (`HH:MM`) → hora fin (`HH:MM`), con validación por parte (`fecha inválida`/`hora inválida`); toda la salida (listar, disponibilidad, cancelar, tiempos de choque) muestra fechas `DD-MM-YYYY HH:MM` vía `_mostrar`, y la entrada acepta DD-MM-YYYY (canónico) sin dejar de aceptar el ISO anterior; almacenamiento interno queda en ISO (D-10). La unidad en disponibilidad se valida **al pedirla** (`_pedir_unidad`: con unidad desconocida avisa y vuelve a pedir antes de las fechas) y el patrón se extendió a **todos los campos que se piden**: el filtro de listar (Enter = todas), la unidad a reservar, el solicitante (V-2), las fechas y horas (formato y orden: el intervalo invertido re-pide las horas/fechas sin perder lo ya válido), y el id a cancelar (Enter abandona sin cancelar; id no numérico o inexistente se re-piden). En el modo por comandos las validaciones del negocio siguen tales cuales (los rechazos van con código 1). La reserva muestra **las reservas activas del equipo al elegir la unidad** (`_ayuda_reservas`: "Reservas activas de MIC-01: ninguna (libre en cualquier horario)" o el listado id/horario/solicitante), y el choque (V-6) se detecta **apenas se completa el intervalo** (`_pedir_intervalo_reserva`): el error sale al toque y solo las fechas se re-piden — unidad y solicitante quedan en pie. Nuevas pruebas: `test_todas_las_salidas_usan_dd_mm_yyyy`, `test_disponibilidad_valida_unidad_antes_de_pedir_fecha`, `test_listar_valida_unidad_antes_de_mostrar_datos`, `test_reservar_valida_unidad_antes_de_pedir_solicitante`, `test_reservar_valida_campo_por_campo`, `test_cancelar_vuelve_a_pedir_id_con_dato_malo`, `test_disponibilidad_rechaza_hora_invalida`, `test_disponibilidad_rechaza_fecha_invalida_y_dd_mm_ambiguo`, `test_disponibilidad_repide_horas_si_el_orden_esta_invertido`, y actualización de `test_menu_muestra_opciones_numeradas` y `test_prompts_instructivos`).
+- **Decisión humana:** pendiente de verificación.
+- **Evidencia:** ejecución real verificada: `listar` muestra `03-11-2026 10:00 -> …`, `disponibilidad --desde "2026-11-03 10:30" --hasta "2026-11-03 12:00"` → `OCUPADA … (choca con reserva id=2 …)` código 1; menú interactivo ejecutado con entrada simulada vía PowerShell. Commit pendiente de cierre del episodio.
+- **Correcciones (ocurrieron):** (a) dos pruebas nuevas fallaron a la primera porque el mock de `input` no reproduce los prompts (se refactorizó con `_consultar`); (b) una secuencia de prueba omitió la unidad → se corrigió la secuencia (falla de la prueba, no de la app); (c) en la base real se creó una reserva de prueba (id=4) para verificar el nuevo formato y se eliminó dejando el estado original.
 
 ---
 

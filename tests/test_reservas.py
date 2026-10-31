@@ -263,9 +263,12 @@ class TestMenuInteractivo(unittest.TestCase):
         with redirect_stdout(buffer), patch("reservas.input", side_effect=["0"]):
             _menu_interactivo(self.ruta_db)
         salida = buffer.getvalue()
-        self.assertIn("1) inventario", salida)
-        self.assertIn("6) reset", salida)
-        self.assertIn("0 | número negativo | /salir", salida)
+        self.assertIn("1) Ver inventario", salida)
+        self.assertIn("6) Reiniciar los datos", salida)
+        self.assertIn("0) Salir", salida)
+        # Menú friendly: sin datos técnicos ni anuncios del uso por consola.
+        self.assertNotIn("Datos persistentes", salida)
+        self.assertNotIn("Uso directo", salida)
 
     def test_opcion_invalida_muestra_mensaje_y_repite_menu(self) -> None:
         buffer = io.StringIO()
@@ -313,6 +316,289 @@ class TestMenuInteractivo(unittest.TestCase):
         self.assertGreater(salida.index("Unidades disponibles:"), salida.index("--- LISTAR RESERVAS ---"))
         for texto in ("FUE-01", "MIC-01", "MIC-02", "MUL-01", "OSC-01", "Osciloscopio", "Multímetro"):
             self.assertIn(texto, salida)
+
+    def test_prompts_instructivos(self) -> None:
+        """Los pedidos de datos dicen qué ingresar y con qué ejemplo."""
+        respuestas = [
+            "3", MIC, "03-11-2026", "10:00", "11:00", "",  # disponibilidad por partes
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            _menu_interactivo(self.ruta_db)
+        salida = buffer.getvalue()
+        self.assertIn("Ingrese el ID de la unidad a consultar (ej.: MIC-01)", salida)
+        self.assertIn("Ingrese la fecha a consultar (DD-MM-YYYY)", salida)
+        self.assertIn("Ingrese la hora de inicio (HH:MM)", salida)
+        self.assertIn("Ingrese la hora de fin (HH:MM)", salida)
+        # La fecha y las horas se componen en el intervalo consultado.
+        self.assertIn("LIBRE: MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00", salida)
+
+    def test_todas_las_salidas_usan_dd_mm_yyyy(self) -> None:
+        """Listar y los mensajes muestran fechas en formato DD-MM-YYYY HH:MM."""
+        respuestas = [
+            "4", MIC, SOLICITANTE_A, "03-11-2026 10:00", "03-11-2026 11:00", "",  # crear
+            "2", "", "",  # listar todas
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        # La reserva se creó con entrada DD-MM-YYYY...
+        self.assertIn("Reserva creada con id=1", salida)
+        # ... y el historial muestra la fecha en formato DD-MM-YYYY.
+        self.assertIn(f"[ACTIVA] {MIC} 03-11-2026 10:00 -> 03-11-2026 11:00 '{SOLICITANTE_A}'", salida)
+        self.assertNotIn("2026-11-03", salida)
+
+    def test_listar_valida_unidad_antes_de_mostrar_datos(self) -> None:
+        """Un filtro de unidad inválido se avisa y se vuelve a pedir."""
+        respuestas = [
+            "2",    # listar
+            "s",    # filtro inválido (como en el reporte real)
+            MIC,    # filtro válido recién entonces
+            "",     # repetir-pregunta: volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: unidad desconocida: 's'", salida)
+        self.assertLess(
+            salida.index("unidad desconocida: 's'"),
+            salida.index("(sin reservas registradas)"),
+        )
+        self.assertEqual(salida.count("Ingrese un ID de unidad para filtrar"), 2)
+
+    def test_reservar_valida_unidad_antes_de_pedir_solicitante(self) -> None:
+        """La unidad a reservar se valida al pedirla, antes del solicitante."""
+        respuestas = [
+            "4",             # reservar
+            "s",             # unidad inválida
+            MIC,             # unidad válida recién entonces
+            SOLICITANTE_A, "03-11-2026 10:00", "03-11-2026 11:00",
+            "",              # repetir-pregunta: volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: unidad desconocida: 's'", salida)
+        self.assertLess(
+            salida.index("unidad desconocida: 's'"),
+            salida.index("Ingrese el solicitante"),
+        )
+        self.assertIn("Reserva creada con id=1", salida)
+
+    def test_reservar_valida_campo_por_campo(self) -> None:
+        """Solicitante vacío, fecha inválida y orden invertido se re-piden en el campo."""
+        respuestas = [
+            "4",                       # reservar
+            MIC,                       # unidad válida
+            "   ",                     # solicitante vacío -> re-pide (V-2)
+            SOLICITANTE_A,             # solicitante válido
+            "ayer",                    # fecha de inicio inválida -> re-pide
+            "03-11-2026 10:00",        # inicio válido
+            "03-11-2026 09:00",        # orden invertido -> re-piden fechas
+            "03-11-2026 10:00", "03-11-2026 11:00",  # intervalo correcto
+            "",                        # repetir-pregunta: volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: solicitante vacío: la reserva necesita un solicitante", salida)
+        self.assertIn("ERROR: fecha y hora inválidas: 'ayer' (se espera 'DD-MM-YYYY HH:MM')", salida)
+        self.assertIn("ERROR: intervalo inválido: inicio '03-11-2026 10:00' debe ser", salida)
+        # La unidad y el solicitante nunca se volvieron a pedir tras validar.
+        self.assertEqual(salida.count("Ingrese el ID de la unidad a reservar"), 1)
+        self.assertIn("Reserva creada con id=1", salida)
+
+    def test_reservar_muestra_reservas_activas_del_equipo(self) -> None:
+        """Antes de pedir horario muestra qué reservas activas tiene la unidad."""
+        lab = Laboratorio(self.ruta_db)
+        lab.reservar(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
+        lab.cerrar()
+        respuestas = [
+            "4", MIC,
+            SOLICITANTE_B,
+            "03-11-2026 12:00", "03-11-2026 13:00",  # horario libre
+            "", "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        # La ayuda sale ANTES de pedir el solicitante/horario.
+        self.assertGreater(salida.index("Ingrese el solicitante"), salida.index("Reservas activas de MIC-01"))
+        self.assertIn(f"03-11-2026 10:00 -> 03-11-2026 11:00 '{SOLICITANTE_A}'", salida)
+        self.assertIn("(ej.: MIC-01)", salida)
+
+    def test_reservar_avisa_equipo_libre_en_cualquier_horario(self) -> None:
+        """Una unidad sin reservas activas lo dice antes de pedir el horario."""
+        respuestas = [
+            "4", "MUL-01",
+            SOLICITANTE_B,
+            "03-11-2026 12:00", "03-11-2026 13:00",
+            "", "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            _menu_interactivo(self.ruta_db)
+        salida = buffer.getvalue()
+        self.assertIn(
+            "Reservas activas de MUL-01: ninguna (libre en cualquier horario).", salida
+        )
+
+    def test_reservar_avisa_solapamiento_apenas_se_completa_intervalo(self) -> None:
+        """El choque (V-6) sale al toque: solo las fechas se vuelven a pedir."""
+        lab = Laboratorio(self.ruta_db)
+        lab.reservar(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
+        lab.cerrar()
+        respuestas = [
+            "4", MIC,
+            "Solicitante B", "03-11-2026 10:30", "03-11-2026 11:15",  # choca
+            "03-11-2026 12:00", "03-11-2026 13:00",  # solo fechas se re-piden
+            "", "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn(
+            "ERROR: unidad MIC-01 ya reservada por 'Solicitante A'"
+            " de 03-11-2026 10:00 a 03-11-2026 11:00 (reserva id=1, activa)", salida
+        )
+        self.assertIn("Reserva creada con id=2", salida)
+        # La unidad y el solicitante no se tipearon otra vez.
+        self.assertEqual(salida.count("Ingrese el ID de la unidad a reservar"), 1)
+        self.assertEqual(salida.count("Ingrese el solicitante"), 1)
+
+    def test_cancelar_vuelve_a_pedir_id_con_dato_malo(self) -> None:
+        """El id se valida al momento: no numérico o inexistente se re-piden."""
+        lab = Laboratorio(self.ruta_db)
+        lab.reservar(MIC, SOLICITANTE_A, DIA_10_00, DIA_11_00)
+        lab.cerrar()
+        respuestas = [
+            "5",      # cancelar
+            "abc",    # no numérico
+            "999",    # inexistente
+            "1",      # válido
+            "",       # repetir-pregunta: volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: el id debe ser un número entero (sin signo).", salida)
+        self.assertIn("ERROR: reserva inexistente: no hay reserva con id=999", salida)
+        self.assertIn("Reserva id=1 cancelada", salida)
+        self.assertIn(
+            "(ej.: 1, Enter = volver al menú)", salida
+        )
+
+    def test_disponibilidad_valida_unidad_antes_de_pedir_fecha(self) -> None:
+        """Un ID de unidad inválido se avisa y se vuelve a pedir ANTES de la fecha."""
+        respuestas = [
+            "3",           # opción disponibilidad
+            "s",           # unidad inválida (como en el reporte real)
+            "XXX-99",      # unidad inválida otra vez
+            MIC,           # unidad válida recién entonces
+            "03-11-2026", "10:00", "11:00",
+            "",            # volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        # Se avisa la unidad desconocida y se re-pide antes de pedir la fecha.
+        self.assertIn("ERROR: unidad desconocida: 's'", salida)
+        self.assertLess(
+            salida.index("unidad desconocida: 's'"),
+            salida.index("Ingrese la fecha a consultar (DD-MM-YYYY)"),
+        )
+        # La fecha nunca se pidió con la unidad inválida todavía en pie.
+        self.assertIn("LIBRE: MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00", salida)
+
+    def test_disponibilidad_rechaza_hora_invalida(self) -> None:
+        """La parte de hora inválida se avisa al pedirse y se re-pide el campo."""
+        respuestas = [
+            "3", MIC, "03-11-2026", "25:00",  # unidad y fecha bien, hora mal
+            "10:00", "11:00",  # solo la hora se vuelve a pedir
+            "",   # volver al menú tras el resultado
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: hora inválida: '25:00' (se espera 'HH:MM')", salida)
+        self.assertIn("LIBRE: MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00", salida)
+
+    def test_disponibilidad_rechaza_fecha_invalida_y_dd_mm_ambiguo(self) -> None:
+        """Una fecha fuera de DD-MM-YYYY e ISO se rechaza con el formato canónico."""
+        respuestas = [
+            "3", MIC, "ayer",  # fecha inválida
+            "03-11-2026", "10:00", "11:00",  # solo la fecha se vuelve a pedir
+            "",   # volver al menú tras el resultado
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: fecha inválida: 'ayer' (se espera 'DD-MM-YYYY')", salida)
+        self.assertIn("LIBRE: MIC-01 03-11-2026 10:00 -> 03-11-2026 11:00", salida)
+
+    def test_disponibilidad_repide_horas_si_el_orden_esta_invertido(self) -> None:
+        """Con fin antes del inicio, el error sale al toque y solo se re-piden horas."""
+        respuestas = [
+            "3", MIC, "03-11-2026", "12:00", "10:00",  # orden invertido
+            "10:00", "12:30",  # horas re-pedidas en orden correcto
+            "",   # volver al menú
+            "0",
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        salida = buffer.getvalue()
+        self.assertIn("ERROR: intervalo inválido: inicio '03-11-2026 12:00'", salida)
+        self.assertIn("LIBRE: MIC-01 03-11-2026 10:00 -> 03-11-2026 12:30", salida)
+
+    def test_repetir_consulta_en_la_misma_opcion(self) -> None:
+        """Tras el resultado, 's' repite la opción y Enter vuelve al menú."""
+        respuestas = [
+            "2",    # listar, filtro vacío (todas)
+            "",     # sin datos: filtro vacío
+            "s",    # repetir la consulta en la misma opción
+            "",     # segunda pasada, filtro vacío
+            "",     # volver al menú
+            "0",    # salir
+        ]
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), patch("reservas.input", side_effect=respuestas):
+            codigo = _menu_interactivo(self.ruta_db)
+        self.assertEqual(codigo, 0)
+        salida = buffer.getvalue()
+        # La opción se ejecutó dos veces dentro del mismo bucle.
+        self.assertEqual(salida.count("--- LISTAR RESERVAS ---"), 2)
+        self.assertIn(
+            "(s = sí, repetir aquí / Enter = volver al menú)", salida
+        )
 
     def test_reset_desde_menu_reinicia(self) -> None:
         lab = Laboratorio(self.ruta_db)
